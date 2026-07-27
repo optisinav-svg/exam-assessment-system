@@ -27,7 +27,7 @@ jobs:
       - name: Build Android APK
         working-directory: ./mobile
         run: |
-          npx expo export:embed --platform android --dev false
+          npx expo export:embed --platform android --dev false --bundle-output android/app/src/main/assets/index.android.bundle
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
