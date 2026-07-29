@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from '../../shared/schema';
+import authRoutes from './routes/auth.routes';
+import examRoutes from './routes/exam.routes';
+import resultRoutes from './routes/result.routes';
+import { verifyToken } from './middleware/auth.middleware';
 
 dotenv.config();
 
@@ -28,6 +32,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+// API Route'ları
+app.use('/api/auth', authRoutes); // Giriş/kayıt - herkese açık
+app.use('/api/exams', verifyToken, examRoutes); // Sınavlar - giriş gerektirir
+app.use('/api/results', verifyToken, resultRoutes); // Sonuçlar - giriş gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
