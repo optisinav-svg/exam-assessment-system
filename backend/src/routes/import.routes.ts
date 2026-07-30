@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../index';
 import { subjects, learningOutcomes } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, isNotNull } from 'drizzle-orm';
 
 const router = Router();
 
@@ -140,7 +140,7 @@ router.get('/grades', async (req: Request, res: Response) => {
       gradeLevel: learningOutcomes.gradeLevel,
     })
     .from(learningOutcomes)
-    .where(learningOutcomes.gradeLevel.isNotNull());
+    .where(isNotNull(learningOutcomes.gradeLevel));
 
     // Benzersiz sınıf seviyelerini çıkar
     const uniqueGrades = [...new Set(results.map(r => r.gradeLevel))].filter(Boolean);
