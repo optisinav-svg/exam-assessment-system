@@ -47,6 +47,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
+// Import routes
+import importRouter from './routes/import.routes';
+app.use('/api/import', importRouter);
+
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
 });
