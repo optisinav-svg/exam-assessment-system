@@ -70,6 +70,7 @@ export const learningOutcomes = pgTable('learning_outcomes', {
   subjectId: integer('subject_id').references(() => subjects.id),
   code: varchar('code', { length: 50 }).notNull(),
   description: text('description').notNull(),
+  gradeLevel: varchar('grade_level', { length: 50 }),
   category: varchar('category', { length: 100 }),
   bloomLevel: varchar('bloom_level', { length: 50 }),
   createdAt: timestamp('created_at').defaultNow(),
