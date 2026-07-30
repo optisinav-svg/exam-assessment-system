@@ -1,6 +1,65 @@
-/* App.css - Özel stiller */
+/* App.css - Özel stiller + Karanlık Mod */
 body {
   margin: 0;
   padding: 0;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Karanlık mod temel stiller */
+.dark body {
+  background-color: #111827;
+  color: #f3f4f6;
+}
+
+/* Tablo geçiş */
+.dark table {
+  color: #f3f4f6;
+}
+
+.dark th {
+  color: #d1d5db;
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Scrollbar karanlık mod */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+/* Tooltip karanlık mod */
+.dark .recharts-tooltip-wrapper {
+  background-color: #1f2937 !important;
+}
+
+/* Geçiş animasyonu */
+* {
+  transition-property: background-color, border-color;
+  transition-duration: 200ms;
+}
+
+/* Buton geçiş hariç */
+button, a, [role="button"] {
+  transition-property: background-color, transform, opacity;
 }
