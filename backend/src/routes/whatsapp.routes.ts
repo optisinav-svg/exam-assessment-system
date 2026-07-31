@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../index';
 import { whatsappLogs, students } from '../../../shared/schema';
-import { eq, desc, sql, inArray } from 'drizzle-orm';
+import { eq, desc, sql, inArray, and } from 'drizzle-orm';
 import crypto from 'crypto';
 
 const router = Router();
@@ -48,7 +48,7 @@ async function sendWhatsAppMessage(
           'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
         },
         body: new URLSearchParams({
-          From: fromNumber,
+          From: fromNumber as string,
           To: toNumber,
           Body: messageText,
         }),
@@ -239,19 +239,23 @@ router.post('/send-class', async (req: Request, res: Response) => {
       parentPhone: students.parentPhone,
     })
     .from(students)
-    .where(eq(students.classId, classId))
-    .where(sql`${students.parentPhone} IS NOT NULL AND ${students.parentPhone} != ''`);
+    .where(and(
+      eq(students.classId, classId),
+      sql`${students.parentPhone} IS NOT NULL AND ${students.parentPhone} != ''`
+    ));
 
     if (classStudents.length === 0) {
       return res.status(404).json({ message: 'Bu sınıfta telefon numarası olan öğrenci bulunamadı.' });
     }
 
-    // recipients formatına çevir
-    const recipients = classStudents.map(s => ({
-      phone: s.parentPhone,
-      name: `${s.firstName} ${s.lastName} (No: ${s.studentNo})`,
-      studentNo: s.studentNo,
-    }));
+    // recipients formatına çevir (telefon numarası kesin dolu olanlar)
+    const recipients = classStudents
+      .filter(s => !!s.parentPhone)
+      .map(s => ({
+        phone: s.parentPhone as string,
+        name: `${s.firstName} ${s.lastName} (No: ${s.studentNo})`,
+        studentNo: s.studentNo,
+      }));
 
     // Toplu gönderim ID
     const bulkGroupId = `class_${classId}_${crypto.randomBytes(4).toString('hex')}`;
