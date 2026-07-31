@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, integer, jsonb, boolean, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, text, timestamp, integer, jsonb, boolean, primaryKey, doublePrecision } from 'drizzle-orm/pg-core';
 
 // Kullanıcılar (Öğretmenler)
 export const users = pgTable('users', {
@@ -87,6 +87,8 @@ export const exams = pgTable('exams', {
   duration: integer('duration'),
   totalQuestions: integer('total_questions').notNull(),
   correctAnswers: jsonb('correct_answers').notNull(),
+  optionCount: integer('option_count').default(4), // 3, 4 veya 5 seçenekli
+  negativeMarking: boolean('negative_marking').default(true), // yanlış doğruyu eksiltsin mi
   status: varchar('status', { length: 50 }).default('draft'),
   createdAt: timestamp('created_at').defaultNow(),
 });
@@ -106,6 +108,7 @@ export const results = pgTable('results', {
   studentNo: varchar('student_no', { length: 50 }),
   answers: jsonb('answers').notNull(),
   score: integer('score'),
+  net: doublePrecision('net'), // yanlış-doğru dengeli net puan
   correctCount: integer('correct_count'),
   wrongCount: integer('wrong_count'),
   emptyCount: integer('empty_count'),

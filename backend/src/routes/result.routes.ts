@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../index';
-import { results } from '../../../shared/schema';
+import { results, exams } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { calculateNet, compareAnswers } from '../utils/scoring';
 
 const router = Router();
 
@@ -16,16 +17,34 @@ router.get('/exam/:examId', async (req: Request, res: Response) => {
   }
 });
 
-// Yeni sonuç ekle
+// Yeni sonuç ekle (doğru/yanlış/net, sınavın doğru cevap anahtarına göre SUNUCUDA hesaplanır)
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { examId, studentNo, answers, score, correctCount, wrongCount, emptyCount, scannedImage } = req.body;
+    const { examId, studentNo, answers, scannedImage } = req.body;
+
+    // İlgili sınavı getir (doğru cevaplar, seçenek sayısı, net ayarı burada)
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
+    if (!exam) {
+      return res.status(404).json({ message: 'Sınav bulunamadı' });
+    }
+
+    const correctAnswersMap = exam.correctAnswers as Record<string, string>;
+    const { correctCount, wrongCount } = compareAnswers(answers ?? {}, correctAnswersMap);
+
+    const { net, score, emptyCount } = calculateNet({
+      correctCount,
+      wrongCount,
+      totalQuestions: exam.totalQuestions,
+      optionCount: exam.optionCount ?? 4,
+      negativeMarking: exam.negativeMarking ?? true,
+    });
 
     const [result] = await db.insert(results).values({
       examId,
       studentNo,
       answers,
       score,
+      net,
       correctCount,
       wrongCount,
       emptyCount,

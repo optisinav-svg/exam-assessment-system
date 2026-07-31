@@ -12,20 +12,38 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
 
 const Stack = createStackNavigator();
+const AuthStack = createStackNavigator();
 
 // Ana Ekran
 function HomeScreen({ navigation }: any) {
+  const { user, logout } = useAuth();
+
   const handleScan = () => {
     navigation.navigate('Scan');
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Çıkış Yap', 'Oturumu kapatmak istediğinize emin misiniz?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Çıkış Yap', style: 'destructive', onPress: logout },
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Çıkış</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>OptikSınav</Text>
-        <Text style={styles.subtitle}>Eğitim Değerlendirme Sistemi</Text>
+        <Text style={styles.subtitle}>
+          {user?.fullName ? `Hoş geldin, ${user.fullName}` : 'Eğitim Değerlendirme Sistemi'}
+        </Text>
       </View>
       
       <View style={styles.menu}>
@@ -159,17 +177,53 @@ function ExamsScreen() {
   );
 }
 
+// Giriş yapılmamışken gösterilen ekranlar
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} />
+    </AuthStack.Navigator>
+  );
+}
+
+// Giriş yapıldıktan sonra gösterilen ekranlar
+function MainNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Scan" component={ScanScreen} />
+      <Stack.Screen name="Results" component={ResultsScreen} />
+      <Stack.Screen name="Exams" component={ExamsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Oturum durumuna göre doğru ekran grubunu seçer
+function RootNavigator() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color="#4A6CF7" />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      {user ? <MainNavigator /> : <AuthNavigator />}
+    </NavigationContainer>
+  );
+}
+
 // Ana Uygulama
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Scan" component={ScanScreen} />
-        <Stack.Screen name="Results" component={ResultsScreen} />
-        <Stack.Screen name="Exams" component={ExamsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
   );
 }
 
@@ -184,6 +238,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#4A6CF7',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    zIndex: 1,
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  loadingScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F4FF',
   },
   title: {
     fontSize: 28,
