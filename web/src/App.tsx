@@ -114,6 +114,8 @@ function AppRoutes() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/import" element={<ImportPage />} />
         <Route path="/results/:examId" element={<ResultsPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/messages" element={<AdminMessagesPage />} />
       </Routes>
     </div>
   );
@@ -849,6 +851,301 @@ function ResultsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin Paneli ────────────────────────────────────────────────────────────
+function AdminPage() {
+  const { theme } = useTheme();
+  const [stats, setStats] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users'>('stats');
+
+  useEffect(() => {
+    // Örnek veriler (API bağlantısı sonrası gerçek veriye dönüşecek)
+    setStats({
+      totals: {
+        users: 15,
+        teachers: 12,
+        admins: 3,
+        exams: 47,
+        results: 1250,
+        students: 480,
+      },
+      recentUsers: [
+        { id: 1, fullName: 'Ahmet Öğretmen', email: 'ahmet@okul.com', role: 'teacher', createdAt: '2026-07-25' },
+        { id: 2, fullName: 'Zeynep Öğretmen', email: 'zeynep@okul.com', role: 'teacher', createdAt: '2026-07-24' },
+      ],
+      recentExams: [
+        { id: 1, title: 'Matematik 1. Dönem', examDate: '2026-01-15', createdAt: '2026-01-10' },
+        { id: 2, title: 'Fen Bilimleri 2. Dönem', examDate: '2026-03-20', createdAt: '2026-03-15' },
+      ],
+    });
+    setUsers([
+      { id: 1, fullName: 'Admin Kullanıcı', email: 'admin@optiksinav.com', role: 'admin', createdAt: '2026-01-01' },
+      { id: 2, fullName: 'Ahmet Öğretmen', email: 'ahmet@okul.com', role: 'teacher', createdAt: '2026-07-25' },
+      { id: 3, fullName: 'Zeynep Öğretmen', email: 'zeynep@okul.com', role: 'teacher', createdAt: '2026-07-24' },
+      { id: 4, fullName: 'Mehmet Öğretmen', email: 'mehmet@okul.com', role: 'teacher', createdAt: '2026-07-20' },
+      { id: 5, fullName: 'Ayşe Öğretmen', email: 'ayse@okul.com', role: 'teacher', createdAt: '2026-07-18' },
+    ]);
+    setLoading(false);
+  }, []);
+
+  const roleColors: Record<string, string> = {
+    admin: 'bg-purple-100 text-purple-700',
+    teacher: 'bg-blue-100 text-blue-700',
+    student: 'bg-green-100 text-green-700',
+  };
+
+  return (
+    <div className={`p-6 max-w-7xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>⚙️ Admin Paneli</h1>
+        <nav className="flex gap-2">
+          <a href="/admin" className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'stats' ? 'bg-blue-600 text-white' : `${bgCard(theme)} ${textMuted(theme)}`}`}>
+            İstatistikler
+          </a>
+          <a href="/admin" className={`px-4 py-2 rounded-lg text-sm font-medium ${activeTab === 'users' ? 'bg-blue-600 text-white' : `${bgCard(theme)} ${textMuted(theme)}`}`}>
+            Kullanıcılar
+          </a>
+          <a href="/admin/messages" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+            Mesaj Gönder
+          </a>
+        </nav>
+      </div>
+
+      {loading ? (
+        <div className={`p-8 text-center ${bgCard(theme)} rounded-xl`}>Yükleniyor...</div>
+      ) : (
+        <>
+          {/* İstatistik Kartları */}
+          {activeTab === 'stats' && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <p className={`text-xs ${textSecondary(theme)}`}>Toplam Kullanıcı</p>
+                  <p className="text-2xl font-bold text-blue-600">{stats?.totals?.users || 0}</p>
+                </div>
+                <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <p className={`text-xs ${textSecondary(theme)}`}>Öğretmen</p>
+                  <p className="text-2xl font-bold text-green-600">{stats?.totals?.teachers || 0}</p>
+                </div>
+                <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <p className={`text-xs ${textSecondary(theme)}`}>Admin</p>
+                  <p className="text-2xl font-bold text-purple-600">{stats?.totals?.admins || 0}</p>
+                </div>
+                <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <p className={`text-xs ${textSecondary(theme)}`}>Sınav</p>
+                  <p className="text-2xl font-bold text-orange-600">{stats?.totals?.exams || 0}</p>
+                </div>
+                <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <p className={`text-xs ${textSecondary(theme)}`}>Sonuç</p>
+                  <p className="text-2xl font-bold text-red-600">{stats?.totals?.results || 0}</p>
+                </div>
+                <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <p className={`text-xs ${textSecondary(theme)}`}>Öğrenci</p>
+                  <p className="text-2xl font-bold text-indigo-600">{stats?.totals?.students || 0}</p>
+                </div>
+              </div>
+
+              {/* Son Kullanıcılar */}
+              <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-6`}>
+                <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Son Eklenen Kullanıcılar</h3>
+                <div className="space-y-3">
+                  {(stats?.recentUsers || []).map((u: any) => (
+                    <div key={u.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <div>
+                        <p className={`font-medium ${textPrimary(theme)}`}>{u.fullName}</p>
+                        <p className={`text-sm ${textSecondary(theme)}`}>{u.email}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${roleColors[u.role] || 'bg-gray-100 text-gray-700'}`}>
+                        {u.role === 'admin' ? 'Admin' : 'Öğretmen'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Son Sınavlar */}
+              <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Son Oluşturulan Sınavlar</h3>
+                <div className="space-y-3">
+                  {(stats?.recentExams || []).map((e: any) => (
+                    <div key={e.id} className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <div>
+                        <p className={`font-medium ${textPrimary(theme)}`}>{e.title}</p>
+                        <p className={`text-sm ${textSecondary(theme)}`}>Tarih: {e.examDate}</p>
+                      </div>
+                      <a href={`/results/${e.id}`} className="text-sm text-blue-600 hover:underline">Sonuçları Gör →</a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Kullanıcılar Tablosu */}
+          {activeTab === 'users' && (
+            <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+              <div className={`p-4 border-b ${borderColor2(theme)}`}>
+                <h3 className={`font-semibold ${textPrimary(theme)}`}>Tüm Kullanıcılar ({users.length})</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}>
+                    <tr>
+                      <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>ID</th>
+                      <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>Ad Soyad</th>
+                      <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>Email</th>
+                      <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Rol</th>
+                      <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>Kayıt Tarihi</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${borderColor2(theme)}`}>
+                    {users.map((u) => (
+                      <tr key={u.id} className={theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={`px-4 py-3 ${textPrimary(theme)}`}>{u.id}</td>
+                        <td className={`px-4 py-3 font-medium ${textPrimary(theme)}`}>{u.fullName}</td>
+                        <td className={`px-4 py-3 ${textSecondary(theme)}`}>{u.email}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${roleColors[u.role] || 'bg-gray-100 text-gray-700'}`}>
+                            {u.role === 'admin' ? 'Admin' : 'Öğretmen'}
+                          </span>
+                        </td>
+                        <td className={`px-4 py-3 ${textSecondary(theme)}`}>{u.createdAt}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin Mesaj Gönderme Sayfası ────────────────────────────────────────────
+function AdminMessagesPage() {
+  const { theme } = useTheme();
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [recipientRole, setRecipientRole] = useState('all');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSend = async () => {
+    if (!title.trim() || !content.trim()) {
+      setError('Başlık ve içerik alanları zorunludur.');
+      return;
+    }
+
+    setSending(true);
+    setError('');
+    setSent(false);
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title, content, recipientRole }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSent(true);
+        setTitle('');
+        setContent('');
+        setRecipientRole('all');
+      } else {
+        setError(data.message || 'Mesaj gönderilemedi.');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className={`p-6 max-w-3xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center gap-4 mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>💬 Sistem Mesajı Gönder</h1>
+        <a href="/admin" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+          ← Admin Paneli
+        </a>
+      </div>
+
+      <div className={`p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+        <div className="space-y-4">
+          {/* Başlık */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Başlık</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Örn: Sistem Bakım Bildirimi"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+            />
+          </div>
+
+          {/* Alıcı */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Alıcı Grubu</label>
+            <select
+              value={recipientRole}
+              onChange={(e) => setRecipientRole(e.target.value)}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+            >
+              <option value="all">Tüm Kullanıcılar</option>
+              <option value="teacher">Sadece Öğretmenler</option>
+              <option value="student">Sadece Öğrenciler</option>
+              <option value="admin">Sadece Adminler</option>
+            </select>
+          </div>
+
+          {/* İçerik */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Mesaj İçeriği</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Mesajınızı buraya yazın..."
+              rows={6}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${inputBg(theme)}`}
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              ⚠️ {error}
+            </div>
+          )}
+
+          {sent && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              ✅ Mesaj başarıyla kaydedildi!
+            </div>
+          )}
+
+          <button
+            onClick={handleSend}
+            disabled={sending || !title.trim() || !content.trim()}
+            className="w-full py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending ? '🔄 Gönderiliyor...' : '📤 Mesaj Gönder'}
+          </button>
         </div>
       </div>
     </div>

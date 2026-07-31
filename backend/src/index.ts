@@ -42,6 +42,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 import importRouter from './routes/import.routes';
 app.use('/api/import', importRouter);
 
+// Admin routes
+import adminRouter from './routes/admin.routes';
+app.use('/api/admin', adminRouter);
+
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
 });
