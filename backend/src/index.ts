@@ -7,6 +7,8 @@ import * as schema from '../../shared/schema';
 import authRoutes from './routes/auth.routes';
 import examRoutes from './routes/exam.routes';
 import resultRoutes from './routes/result.routes';
+import importRouter from './routes/import.routes';
+import adminRouter from './routes/admin.routes';
 import { verifyToken } from './middleware/auth.middleware';
 
 dotenv.config();
@@ -37,6 +39,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes); // Giriş/kayıt - herkese açık
 app.use('/api/exams', verifyToken, examRoutes); // Sınavlar - giriş gerektirir
 app.use('/api/results', verifyToken, resultRoutes); // Sonuçlar - giriş gerektirir
+app.use('/api/import', verifyToken, importRouter); // Excel import - giriş gerektirir
+app.use('/api/admin', verifyToken, adminRouter); // Admin paneli - giriş + admin rolü gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -46,14 +50,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 });
-
-// Import routes
-import importRouter from './routes/import.routes';
-app.use('/api/import', importRouter);
-
-// Admin routes
-import adminRouter from './routes/admin.routes';
-app.use('/api/admin', adminRouter);
 
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
