@@ -128,3 +128,18 @@ export const messages = pgTable('messages', {
   isRead: boolean('is_read').default(false),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// Yüklene Dosyalar (Bulut Depolama)
+export const uploadedFiles = pgTable('uploaded_files', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  fileName: varchar('file_name', { length: 255 }).notNull(),
+  originalName: varchar('original_name', { length: 255 }).notNull(),
+  mimeType: varchar('mime_type', { length: 100 }).notNull(),
+  fileSize: integer('file_size').notNull(), // bytes
+  filePath: text('file_path').notNull(),
+  category: varchar('category', { length: 50 }), // 'import', 'exam_result', 'optical_template', 'report'
+  examId: integer('exam_id').references(() => exams.id),
+  isPublic: boolean('is_public').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
