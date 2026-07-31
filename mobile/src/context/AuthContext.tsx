@@ -28,17 +28,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Uygulama açıldığında, cihazda daha önce kaydedilmiş bir oturum var mı bak.
+    // NOT: Cihazda ekran kilidi/güvenli depolama yoksa SecureStore hata verebilir,
+    // bu durumda çökme yerine "oturum yok" kabul edip devam ediyoruz.
     (async () => {
-      const token = await getToken();
-      if (!token) {
+      try {
+        const token = await getToken();
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
+        const storedUser = await getStoredUser();
+        if (storedUser) {
+          setUser(storedUser);
+        }
+      } catch (error) {
+        console.warn('Kayıtlı oturum okunamadı:', error);
+      } finally {
         setIsLoading(false);
-        return;
       }
-      const storedUser = await getStoredUser();
-      if (storedUser) {
-        setUser(storedUser);
-      }
-      setIsLoading(false);
     })();
   }, []);
 
@@ -67,7 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await clearToken();
+    try {
+      await clearToken();
+    } catch (error) {
+      console.warn('Oturum temizlenemedi:', error);
+    }
     setUser(null);
   };
 
