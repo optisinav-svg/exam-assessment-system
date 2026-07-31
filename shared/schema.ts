@@ -143,3 +143,18 @@ export const uploadedFiles = pgTable('uploaded_files', {
   isPublic: boolean('is_public').default(false),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// WhatsApp Mesaj Geçmişi
+export const whatsappLogs = pgTable('whatsapp_logs', {
+  id: serial('id').primaryKey(),
+  senderId: integer('sender_id').references(() => users.id),
+  recipientPhone: varchar('recipient_phone', { length: 20 }).notNull(),
+  recipientName: varchar('recipient_name', { length: 255 }),
+  message: text('message').notNull(),
+  status: varchar('status', { length: 50 }).default('pending'), // 'pending', 'sent', 'failed', 'delivered'
+  isBulkMessage: boolean('is_bulk_message').default(false),
+  bulkGroupId: varchar('bulk_group_id', { length: 100 }), // Aynı toplu gönderimdeki mesajları grupla
+  errorDetail: text('error_detail'),
+  sentAt: timestamp('sent_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});

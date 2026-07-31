@@ -10,6 +10,7 @@ import resultRoutes from './routes/result.routes';
 import importRouter from './routes/import.routes';
 import adminRouter from './routes/admin.routes';
 import storageRouter from './routes/storage.routes';
+import whatsappRouter from './routes/whatsapp.routes';
 import { verifyToken } from './middleware/auth.middleware';
 
 dotenv.config();
@@ -43,6 +44,7 @@ app.use('/api/results', verifyToken, resultRoutes); // Sonuçlar - giriş gerekt
 app.use('/api/import', verifyToken, importRouter); // Excel import - giriş gerektirir
 app.use('/api/admin', verifyToken, adminRouter); // Admin paneli - giriş + admin rolü gerektirir
 app.use('/api/storage', verifyToken, storageRouter); // Dosya depolama - giriş gerektirir
+app.use('/api/whatsapp', verifyToken, whatsappRouter); // WhatsApp mesajlaşma - giriş gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
