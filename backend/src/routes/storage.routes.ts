@@ -5,7 +5,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { db } from '../index';
 import { uploadedFiles } from '../../../shared/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 
 const router = Router();
 
@@ -80,9 +80,14 @@ function handleMulterError(err: any, _req: Request, res: Response, next: any) {
 router.get('/list', async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-    const category = req.query.category as string;
+    const category = req.query.category as string | undefined;
 
-    let query = db
+    const conditions = [];
+    if (userId) conditions.push(eq(uploadedFiles.userId, userId));
+    if (category) conditions.push(eq(uploadedFiles.category, category));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const files = await db
       .select({
         id: uploadedFiles.id,
         fileName: uploadedFiles.fileName,
@@ -94,33 +99,10 @@ router.get('/list', async (req: Request, res: Response) => {
         createdAt: uploadedFiles.createdAt,
       })
       .from(uploadedFiles)
-      .orderBy(desc(uploadedFiles.createdAt));
+      .where(whereClause)
+      .orderBy(desc(uploadedFiles.createdAt))
+      .limit(100);
 
-    if (userId) {
-      query = query.where(sql`${uploadedFiles.userId} = ${userId}`);
-    }
-
-    if (category) {
-      const baseWhere = userId ? sql`${uploadedFiles.userId} = ${userId}` : undefined;
-      const files = await db
-        .select({
-          id: uploadedFiles.id,
-          fileName: uploadedFiles.fileName,
-          originalName: uploadedFiles.originalName,
-          mimeType: uploadedFiles.mimeType,
-          fileSize: uploadedFiles.fileSize,
-          category: uploadedFiles.category,
-          isPublic: uploadedFiles.isPublic,
-          createdAt: uploadedFiles.createdAt,
-        })
-        .from(uploadedFiles)
-        .where(sql`${uploadedFiles.category} = ${category} AND (${baseWhere || sql`true`})`)
-        .orderBy(desc(uploadedFiles.createdAt));
-
-      return res.json({ total: files.length, files });
-    }
-
-    const files = await query.limit(100);
     res.json({ total: files.length, files });
   } catch (error: any) {
     console.error('Storage list error:', error);
