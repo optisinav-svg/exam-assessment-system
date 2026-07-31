@@ -130,3 +130,240 @@ function ScanScreen({ navigation }: any) {
         {result && (
           <View style={styles.resultContainer}>
             <Text style={styles.resultTitle}>Sonuç</Text>
+            <Text style={styles.resultScore}>Puan: {result.score}</Text>
+            <Text style={styles.resultAnswers}>
+              Cevaplar: {result.answers.join(', ')}
+            </Text>
+          </View>
+        )}
+        
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.scanButton} onPress={takePhoto}>
+            <Text style={styles.buttonText}>Fotoğraf Çek</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.scanButton} onPress={pickImage}>
+            <Text style={styles.buttonText}>Galeriden Seç</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// Örnek Sonuçlar Ekranı
+function ResultsScreen() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Sonuçlar</Text>
+      </View>
+      <View style={styles.resultsList}>
+        <Text style={styles.subtitle}>Henüz sonuç yok</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// Örnek Sınavlar Ekranı
+function ExamsScreen() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Sınavlar</Text>
+      </View>
+      <View style={styles.resultsList}>
+        <Text style={styles.subtitle}>Henüz sınav yok</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// Giriş yapılmamışken gösterilen ekranlar
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} />
+    </AuthStack.Navigator>
+  );
+}
+
+// Giriş yapıldıktan sonra gösterilen ekranlar
+function MainNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Scan" component={ScanScreen} />
+      <Stack.Screen name="Results" component={ResultsScreen} />
+      <Stack.Screen name="Exams" component={ExamsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Oturum durumuna göre doğru ekran grubunu seçer
+function RootNavigator() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color="#4A6CF7" />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      {user ? <MainNavigator /> : <AuthNavigator />}
+    </NavigationContainer>
+  );
+}
+
+// Ana Uygulama
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </ErrorBoundary>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F0F4FF',
+  },
+  header: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#4A6CF7',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    zIndex: 1,
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  loadingScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F4FF',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#E0E7FF',
+    marginTop: 4,
+  },
+  menu: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 16,
+  },
+  menuItem: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  menuIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  menuText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  scanContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  previewImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  loadingText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#4A6CF7',
+    marginTop: 12,
+  },
+  resultContainer: {
+    backgroundColor: '#E8F5E9',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  resultTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  resultScore: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1B5E20',
+  },
+  resultAnswers: {
+    fontSize: 14,
+    color: '#333',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  scanButton: {
+    backgroundColor: '#4A6CF7',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginVertical: 8,
+    flex: 1,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  resultsList: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
