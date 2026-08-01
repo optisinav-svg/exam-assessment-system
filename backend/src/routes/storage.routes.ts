@@ -236,3 +236,37 @@ router.get('/stats', async (req: Request, res: Response) => {
     })
     .from(uploadedFiles)
     .groupBy(uploadedFiles.category);
+
+    // Son yüklenen dosyalar
+    const recentFiles = await db.select({
+      id: uploadedFiles.id,
+      originalName: uploadedFiles.originalName,
+      mimeType: uploadedFiles.mimeType,
+      fileSize: uploadedFiles.fileSize,
+      category: uploadedFiles.category,
+      createdAt: uploadedFiles.createdAt,
+    })
+    .from(uploadedFiles)
+    .orderBy(desc(uploadedFiles.createdAt))
+    .limit(10);
+
+    res.json({
+      totalFiles: totalFiles[0]?.count || 0,
+      totalSizeBytes: totalSize[0]?.sum || 0,
+      totalSizeFormatted: totalSize[0]?.sum
+        ? totalSize[0].sum > 1024 * 1024 * 1024
+          ? `${(totalSize[0].sum / (1024 * 1024 * 1024)).toFixed(2)} GB`
+          : totalSize[0].sum > 1024 * 1024
+            ? `${(totalSize[0].sum / (1024 * 1024)).toFixed(2)} MB`
+            : `${(totalSize[0].sum / 1024).toFixed(2)} KB`
+        : '0 B',
+      byCategory,
+      recentFiles,
+    });
+  } catch (error: any) {
+    console.error('Storage stats error:', error);
+    res.status(500).json({ message: 'İstatistikler getirilirken hata oluştu', error: error.message });
+  }
+});
+
+export default router;
