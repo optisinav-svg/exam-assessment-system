@@ -84,4 +84,8 @@ export function studentApprovedEmailHtml(studentName: string): string {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
       <h2 style="color: #4A6CF7;">OptikSınav - Hesabınız Onaylandı</h2>
-      <p>Merhaba
+      <p>Merhaba ${studentName},</p>
+      <p>Öğretmeniniz kayıt isteğinizi onayladı. Artık uygulamaya giriş yapabilir, sınav sonuçlarınızı görüntüleyebilirsiniz.</p>
+    </div>
+  `;
+}
