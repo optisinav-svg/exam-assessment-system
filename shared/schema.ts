@@ -33,13 +33,20 @@ export const classes = pgTable('classes', {
 // Öğrenciler
 export const students = pgTable('students', {
   id: serial('id').primaryKey(),
-  studentNo: varchar('student_no', { length: 50 }).notNull(),
+  studentNo: varchar('student_no', { length: 50 }),
   classId: integer('class_id').references(() => classes.id),
   firstName: varchar('first_name', { length: 100 }).notNull(),
   lastName: varchar('last_name', { length: 100 }).notNull(),
   parentPhone: varchar('parent_phone', { length: 20 }),
   createdAt: timestamp('created_at').defaultNow(),
   isActive: boolean('is_active').default(true),
+  // Öğrenci kendi hesabıyla kayıt olduğunda kullanılır
+  email: varchar('email', { length: 255 }).unique(),
+  password: text('password'),
+  teacherId: integer('teacher_id').references(() => users.id), // bağlanmak istediği öğretmen
+  isApproved: boolean('is_approved').default(false), // öğretmen onayı
+  isEmailVerified: boolean('is_email_verified').default(false), // e-posta onayı
+  emailVerificationToken: varchar('email_verification_token', { length: 255 }),
 });
 
 // Optik Şablonlar
@@ -129,7 +136,7 @@ export const messages = pgTable('messages', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-// Yüklene Dosyalar (Bulut Depolama)
+// Yüklenen Dosyalar (Bulut Depolama)
 export const uploadedFiles = pgTable('uploaded_files', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id),
@@ -153,7 +160,7 @@ export const whatsappLogs = pgTable('whatsapp_logs', {
   message: text('message').notNull(),
   status: varchar('status', { length: 50 }).default('pending'), // 'pending', 'sent', 'failed', 'delivered'
   isBulkMessage: boolean('is_bulk_message').default(false),
-  bulkGroupId: varchar('bulk_group_id', { length: 100 }), // Aynı toplu gönderimdeki mesajları grupla
+  bulkGroupId: varchar('bulk_group_id', { length: 100 }),
   errorDetail: text('error_detail'),
   sentAt: timestamp('sent_at'),
   createdAt: timestamp('created_at').defaultNow(),
