@@ -15,6 +15,8 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import StudentRegisterScreen from './screens/StudentRegisterScreen';
+import PendingStudentsScreen from './screens/PendingStudentsScreen';
 import { ErrorBoundary } from './ErrorBoundary';
 
 const Stack = createStackNavigator();
@@ -23,6 +25,7 @@ const AuthStack = createStackNavigator();
 // Ana Ekran
 function HomeScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+  const isTeacher = user?.role === 'teacher';
 
   const handleScan = () => {
     navigation.navigate('Scan');
@@ -46,23 +49,38 @@ function HomeScreen({ navigation }: any) {
           {user?.fullName ? `Hoş geldin, ${user.fullName}` : 'Eğitim Değerlendirme Sistemi'}
         </Text>
       </View>
-      
-      <View style={styles.menu}>
-        <TouchableOpacity style={styles.menuItem} onPress={handleScan}>
-          <Text style={styles.menuIcon}>📸</Text>
-          <Text style={styles.menuText}>Optik Oku</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Results')}>
-          <Text style={styles.menuIcon}>📊</Text>
-          <Text style={styles.menuText}>Sonuçlar</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Exams')}>
-          <Text style={styles.menuIcon}>📝</Text>
-          <Text style={styles.menuText}>Sınavlar</Text>
-        </TouchableOpacity>
-      </View>
+
+      {isTeacher ? (
+        <View style={styles.menu}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleScan}>
+            <Text style={styles.menuIcon}>📸</Text>
+            <Text style={styles.menuText}>Optik Oku</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Results')}>
+            <Text style={styles.menuIcon}>📊</Text>
+            <Text style={styles.menuText}>Sonuçlar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Exams')}>
+            <Text style={styles.menuIcon}>📝</Text>
+            <Text style={styles.menuText}>Sınavlar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('PendingStudents')}>
+            <Text style={styles.menuIcon}>🎓</Text>
+            <Text style={styles.menuText}>Bekleyen{'\n'}Öğrenciler</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.centerMessage}>
+          <Text style={styles.centerMessageIcon}>🎓</Text>
+          <Text style={styles.centerMessageText}>
+            Öğrenci paneli yakında burada olacak.{'\n'}
+            Sonuçlarını ve kazanımlarını yakında buradan görebileceksin.
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -184,6 +202,7 @@ function AuthNavigator() {
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="StudentRegister" component={StudentRegisterScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -196,6 +215,7 @@ function MainNavigator() {
       <Stack.Screen name="Scan" component={ScanScreen} />
       <Stack.Screen name="Results" component={ResultsScreen} />
       <Stack.Screen name="Exams" component={ExamsScreen} />
+      <Stack.Screen name="PendingStudents" component={PendingStudentsScreen} />
     </Stack.Navigator>
   );
 }
@@ -301,6 +321,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
+    textAlign: 'center',
+  },
+  centerMessage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  centerMessageIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  centerMessageText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   scanContainer: {
     flex: 1,
