@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { 
   SafeAreaView, 
   StyleSheet, 
@@ -7,9 +7,10 @@ import {
   View,
   Image,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  FlatList,
 } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -17,6 +18,8 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import StudentRegisterScreen from './screens/StudentRegisterScreen';
 import PendingStudentsScreen from './screens/PendingStudentsScreen';
+import CreateExamScreen from './screens/CreateExamScreen';
+import { getExams, Exam } from './services/api';
 import { ErrorBoundary } from './ErrorBoundary';
 
 const Stack = createStackNavigator();
@@ -182,16 +185,64 @@ function ResultsScreen() {
   );
 }
 
-// Örnek Sınavlar Ekranı
-function ExamsScreen() {
+// Sınavlar Ekranı
+function ExamsScreen({ navigation }: any) {
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadExams = useCallback(async () => {
+    try {
+      const data = await getExams();
+      setExams(data);
+    } catch (error) {
+      // Hata durumunda liste boş kalır, tekrar odaklanınca yeniden denenir
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      loadExams();
+    }, [loadExams])
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Sınavlar</Text>
+        <TouchableOpacity
+          style={styles.newExamButton}
+          onPress={() => navigation.navigate('CreateExam')}
+        >
+          <Text style={styles.newExamButtonText}>+ Yeni Sınav</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.resultsList}>
-        <Text style={styles.subtitle}>Henüz sınav yok</Text>
-      </View>
+
+      {isLoading ? (
+        <View style={styles.resultsList}>
+          <ActivityIndicator size="large" color="#4A6CF7" />
+        </View>
+      ) : exams.length === 0 ? (
+        <View style={styles.resultsList}>
+          <Text style={styles.subtitle}>Henüz sınav yok</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={exams}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.examList}
+          renderItem={({ item }) => (
+            <View style={styles.examCard}>
+              <Text style={styles.examCardTitle}>{item.title}</Text>
+              <Text style={styles.examCardDetail}>
+                {item.examDate?.slice(0, 10)} · {item.totalQuestions} soru · {item.optionCount} seçenekli
+              </Text>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -215,6 +266,7 @@ function MainNavigator() {
       <Stack.Screen name="Scan" component={ScanScreen} />
       <Stack.Screen name="Results" component={ResultsScreen} />
       <Stack.Screen name="Exams" component={ExamsScreen} />
+      <Stack.Screen name="CreateExam" component={CreateExamScreen} />
       <Stack.Screen name="PendingStudents" component={PendingStudentsScreen} />
     </Stack.Navigator>
   );
@@ -261,6 +313,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#4A6CF7',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+  },
+  newExamButton: {
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  newExamButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  examList: {
+    padding: 16,
+  },
+  examCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  examCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#222',
+  },
+  examCardDetail: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 4,
   },
   logoutButton: {
     position: 'absolute',
