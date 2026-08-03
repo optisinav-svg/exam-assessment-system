@@ -56,8 +56,11 @@ export interface AuthUser {
   role: string;
 }
 
-export async function loginRequest(email: string, password: string) {
-  const { data } = await api.post<{ token: string; user: AuthUser }>('/auth/login', {
+export type UserRole = 'teacher' | 'student';
+
+export async function loginRequest(email: string, password: string, role: UserRole = 'teacher') {
+  const endpoint = role === 'teacher' ? '/auth/login' : '/student-auth/login';
+  const { data } = await api.post<{ token: string; user: AuthUser }>(endpoint, {
     email,
     password,
   });
@@ -71,5 +74,45 @@ export async function registerRequest(email: string, password: string, fullName:
     fullName,
     role: 'teacher',
   });
+  return data;
+}
+
+export interface StudentRegisterInput {
+  email: string;
+  password: string;
+  fullName: string;
+  studentNo?: string;
+  teacherEmail: string;
+}
+
+export async function studentRegisterRequest(input: StudentRegisterInput) {
+  const { data } = await api.post<{ message: string; studentId: number }>(
+    '/student-auth/register',
+    input
+  );
+  return data;
+}
+
+export interface PendingStudent {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  studentNo: string | null;
+  createdAt: string;
+}
+
+export async function getPendingStudents() {
+  const { data } = await api.get<PendingStudent[]>('/students/pending');
+  return data;
+}
+
+export async function approveStudent(id: number, options?: { classId?: number; studentNo?: string }) {
+  const { data } = await api.post(`/students/${id}/approve`, options || {});
+  return data;
+}
+
+export async function rejectStudent(id: number) {
+  const { data } = await api.post(`/students/${id}/reject`);
   return data;
 }

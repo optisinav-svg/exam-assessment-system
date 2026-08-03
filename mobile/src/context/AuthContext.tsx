@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   AuthUser,
+  UserRole,
   getToken,
   saveToken,
   clearToken,
@@ -14,7 +15,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean; // uygulama açılırken kayıtlı oturum kontrol ediliyor mu
   isSubmitting: boolean; // giriş/kayıt isteği gönderiliyor mu
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, role?: UserRole) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -49,10 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, role: UserRole = 'teacher') => {
     setIsSubmitting(true);
     try {
-      const data = await loginRequest(email, password);
+      const data = await loginRequest(email, password, role);
       await saveToken(data.token);
       await saveUser(data.user);
       setUser(data.user);

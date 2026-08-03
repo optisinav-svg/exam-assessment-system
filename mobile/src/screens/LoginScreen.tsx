@@ -12,9 +12,11 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../services/api';
 
 export default function LoginScreen({ navigation }: any) {
   const { login, isSubmitting } = useAuth();
+  const [role, setRole] = useState<UserRole>('teacher');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -24,7 +26,7 @@ export default function LoginScreen({ navigation }: any) {
       return;
     }
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, role);
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
@@ -42,7 +44,28 @@ export default function LoginScreen({ navigation }: any) {
         <View style={styles.header}>
           <Text style={styles.logo}>📝</Text>
           <Text style={styles.title}>OptikSınav</Text>
-          <Text style={styles.subtitle}>Öğretmen Girişi</Text>
+          <Text style={styles.subtitle}>Giriş Yap</Text>
+        </View>
+
+        <View style={styles.roleSwitch}>
+          <TouchableOpacity
+            style={[styles.roleButton, role === 'teacher' && styles.roleButtonActive]}
+            onPress={() => setRole('teacher')}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.roleButtonText, role === 'teacher' && styles.roleButtonTextActive]}>
+              Öğretmen
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.roleButton, role === 'student' && styles.roleButtonActive]}
+            onPress={() => setRole('student')}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.roleButtonText, role === 'student' && styles.roleButtonTextActive]}>
+              Öğrenci
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.form}>
@@ -79,15 +102,27 @@ export default function LoginScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate('Register')}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.linkText}>
-              Hesabın yok mu? <Text style={styles.linkTextBold}>Kayıt ol</Text>
-            </Text>
-          </TouchableOpacity>
+          {role === 'teacher' ? (
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate('Register')}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.linkText}>
+                Hesabın yok mu? <Text style={styles.linkTextBold}>Öğretmen Kaydı</Text>
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate('StudentRegister')}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.linkText}>
+                Hesabın yok mu? <Text style={styles.linkTextBold}>Öğrenci Kaydı</Text>
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -103,7 +138,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   logo: {
     fontSize: 48,
@@ -118,6 +153,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 4,
+  },
+  roleSwitch: {
+    flexDirection: 'row',
+    backgroundColor: '#E0E7FF',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  roleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  roleButtonActive: {
+    backgroundColor: '#4A6CF7',
+  },
+  roleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A6CF7',
+  },
+  roleButtonTextActive: {
+    color: '#fff',
   },
   form: {
     backgroundColor: '#fff',
