@@ -370,13 +370,16 @@ function DashboardPage() {
   );
 }
 
-// Excel Import Sayfası - Karanlık Mod Uyumlu
+// Excel Import Sayfası - .xlsx Dosya Yükleme + JSON Yapıştırma
 function ImportPage() {
   const { theme } = useTheme();
   const [jsonText, setJsonText] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'file' | 'json'>('file');
+  const [filePreview, setFilePreview] = useState<any[]>([]);
+  const [selectedFileName, setSelectedFileName] = useState('');
 
   const exampleJson = `[
   {
@@ -399,13 +402,12 @@ function ImportPage() {
   }
 ]`;
 
-  const handleImport = async () => {
+  const handleImport = async (items: any[]) => {
     setLoading(true);
     setError('');
     setResult(null);
 
     try {
-      const items = JSON.parse(jsonText);
       const response = await fetch(`${API_BASE}/import/excel`, {
         method: 'POST',
         headers: {
@@ -422,9 +424,70 @@ function ImportPage() {
         setError(data.message || 'Import işlemi başarısız');
       }
     } catch (err: any) {
-      setError('JSON formatı geçersiz: ' + err.message);
+      setError('Bağlantı hatası: ' + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // .xlsx dosya okuma
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setSelectedFileName(file.name);
+
+    try {
+      // SheetJS (xlsx) kütüphanesini CDN'den yükle
+      const XLSX = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+      const xlsx = XLSX.default || XLSX;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = xlsx.read(arrayBuffer, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = xlsx.utils.sheet_to_json(firstSheet);
+
+      // Excel satırlarını API formatına dönüştür
+      const items = (jsonData as any[]).map(row => ({
+        dersAdi: String(row['Ders adı'] || row['Ders Adı'] || row['dersAdi'] || row['ders'] || ''),
+        sinif: String(row['Sınıf'] || row['sinif'] || row['sınıf'] || row['class'] || ''),
+        kazanımKodu: String(row['Kazanım kodu'] || row['Kazanım Kodu'] || row['kazanımKodu'] || row['kod'] || ''),
+        kazanımIsmi: String(row['Kazanım ismi'] || row['Kazanım İsmi'] || row['kazanımIsmi'] || row['kazanım'] || ''),
+      })).filter(item => item.dersAdi || item.kazanımKodu); // Boş satırları filtrele
+
+      setFilePreview(items);
+
+      // Önizleme göster, kullanıcı onaylarsa gönder
+      setResult(null);
+      setLoading(false);
+    } catch (err: any) {
+      setError('Excel dosyası okunamadı: ' + err.message);
+      setLoading(false);
+    }
+
+    // Input'u sıfırla (aynı dosyayı tekrar seçebilmek için)
+    e.target.value = '';
+  };
+
+  const sendFileData = () => {
+    if (filePreview.length > 0) {
+      handleImport(filePreview);
+    }
+  };
+
+  const handleJsonImport = () => {
+    try {
+      const items = JSON.parse(jsonText);
+      if (Array.isArray(items)) {
+        handleImport(items);
+      } else {
+        setError('JSON bir dizi (array) olmalıdır');
+      }
+    } catch (err: any) {
+      setError('JSON formatı geçersiz: ' + err.message);
     }
   };
 
@@ -436,66 +499,200 @@ function ImportPage() {
     <div className={`p-6 max-w-4xl mx-auto transition-colors duration-300`}>
       <h1 className={`text-2xl font-bold mb-2 ${textPrimary(theme)}`}>📥 Ders & Kazanım İçe Aktarma</h1>
       <p className={`mb-6 ${textMuted(theme)}`}>
-        Excel dosyanızdaki ders ve kazanım bilgilerini JSON formatında girerek sisteme aktarabilirsiniz.
+        Excel dosyanızdaki ders ve kazanım bilgilerini sisteme aktarabilirsiniz.
         Sınıf sütunu boş olan satırlar otomatik olarak <strong>"Mezun"</strong> sınıfına atanır.
       </p>
 
-      <div className={`p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${textMuted(theme)}`}>JSON Verisi</h3>
-          <button
-            onClick={loadExample}
-            className={`px-3 py-1 text-sm rounded hover:bg-gray-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}
-          >
-            Örnek Yükle
-          </button>
-        </div>
-
-        <textarea
-          value={jsonText}
-          onChange={(e) => setJsonText(e.target.value)}
-          placeholder={exampleJson}
-          className={`w-full h-64 p-4 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${inputBg(theme)}`}
-        />
-
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            ⚠️ {error}
-          </div>
-        )}
-
-        {result && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h4 className="font-semibold text-green-800 mb-2">✅ Import Başarılı!</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div>
-                <span className="text-gray-500">Toplam Satır:</span>
-                <p className="font-bold text-green-700">{result.stats.totalRows}</p>
-              </div>
-              <div>
-                <span className="text-gray-500">Oluşturulan Ders:</span>
-                <p className="font-bold text-blue-700">{result.stats.subjectsCreated}</p>
-              </div>
-              <div>
-                <span className="text-gray-500">Eklenen Kazanım:</span>
-                <p className="font-bold text-purple-700">{result.stats.outcomesCreated}</p>
-              </div>
-              <div>
-                <span className="text-gray-500">Atlanan Satır:</span>
-                <p className="font-bold text-orange-700">{result.stats.skippedRows}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
+      {/* Sekmeler */}
+      <div className="flex gap-2 mb-6">
         <button
-          onClick={handleImport}
-          disabled={loading || !jsonText.trim()}
-          className="mt-4 w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => setActiveTab('file')}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'file'
+              ? 'bg-blue-600 text-white'
+              : theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+          }`}
         >
-          {loading ? '🔄 İşleniyor...' : '📤 İçe Aktar'}
+          📁 Excel Dosyası Yükle
+        </button>
+        <button
+          onClick={() => setActiveTab('json')}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'json'
+              ? 'bg-blue-600 text-white'
+              : theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          {'{}'} JSON Yapıştır
         </button>
       </div>
+
+      {/* Excel Dosya Yükleme Sekmesi */}
+      {activeTab === 'file' && (
+        <div className={`p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Excel Dosyası Seçin</h3>
+
+          <div className={`border-2 border-dashed rounded-xl p-8 text-center ${
+            theme === 'dark' ? 'border-gray-600 hover:border-blue-400' : 'border-gray-300 hover:border-blue-500'
+          } transition-colors`}>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="excel-upload"
+            />
+            <label htmlFor="excel-upload" className="cursor-pointer">
+              <div className="text-5xl mb-4">📄</div>
+              <p className={`text-lg font-medium mb-2 ${textPrimary(theme)}`}>
+                Excel dosyasını sürükleyin veya tıklayın
+              </p>
+              <p className={`text-sm ${textSecondary(theme)}`}>
+                .xlsx, .xls veya .csv formatında olabilir
+              </p>
+              <p className={`text-xs mt-2 ${textMuted(theme)}`}>
+                Sütunlar: Ders adı, Sınıf, Kazanım kodu, Kazanım ismi
+              </p>
+            </label>
+          </div>
+
+          {/* Dosya önizleme */}
+          {selectedFileName && (
+            <div className={`mt-4 p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <p className={`font-medium ${textPrimary(theme)}`}>📎 {selectedFileName}</p>
+                <span className={`text-sm ${textSecondary(theme)}`}>{filePreview.length} satır bulundu</span>
+              </div>
+
+              {filePreview.length > 0 && (
+                <div className="overflow-x-auto mt-3">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className={theme === 'dark' ? 'bg-gray-600' : 'bg-blue-100'}>
+                        <th className={`px-2 py-1 text-left ${textPrimary(theme)}`}>Ders</th>
+                        <th className={`px-2 py-1 text-left ${textPrimary(theme)}`}>Sınıf</th>
+                        <th className={`px-2 py-1 text-left ${textPrimary(theme)}`}>Kod</th>
+                        <th className={`px-2 py-1 text-left ${textPrimary(theme)}`}>Kazanım</th>
+                      </tr>
+                    </thead>
+                    <tbody className={borderColor2(theme)}>
+                      {filePreview.slice(0, 10).map((item, i) => (
+                        <tr key={i} className={borderColor2(theme)}>
+                          <td className={`px-2 py-1 ${textPrimary(theme)}`}>{item.dersAdi}</td>
+                          <td className={`px-2 py-1 ${textSecondary(theme)}`}>{item.sinif || <em>Mezun</em>}</td>
+                          <td className={`px-2 py-1 ${textPrimary(theme)}`}>{item.kazanımKodu}</td>
+                          <td className={`px-2 py-1 ${textPrimary(theme)}`}>{item.kazanımIsmi.substring(0, 40)}{item.kazanımIsmi.length > 40 ? '...' : ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filePreview.length > 10 && (
+                    <p className={`text-xs mt-2 ${textMuted(theme)}`}>...ve {filePreview.length - 10} satır daha</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              ⚠️ {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h4 className="font-semibold text-green-800 mb-2">✅ Import Başarılı!</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500">Toplam Satır:</span>
+                  <p className="font-bold text-green-700">{result.stats.totalRows}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Oluşturulan Ders:</span>
+                  <p className="font-bold text-blue-700">{result.stats.subjectsCreated}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Eklenen Kazanım:</span>
+                  <p className="font-bold text-purple-700">{result.stats.outcomesCreated}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Atlanan Satır:</span>
+                  <p className="font-bold text-orange-700">{result.stats.skippedRows}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={sendFileData}
+            disabled={loading || filePreview.length === 0}
+            className="mt-4 w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? '🔄 İşleniyor...' : `📤 İçe Aktar (${filePreview.length} satır)`}
+          </button>
+        </div>
+      )}
+
+      {/* JSON Yapıştırma Sekmesi */}
+      {activeTab === 'json' && (
+        <div className={`p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-lg font-semibold ${textMuted(theme)}`}>JSON Verisi</h3>
+            <button
+              onClick={loadExample}
+              className={`px-3 py-1 text-sm rounded hover:bg-gray-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'}`}
+            >
+              Örnek Yükle
+            </button>
+          </div>
+
+          <textarea
+            value={jsonText}
+            onChange={(e) => setJsonText(e.target.value)}
+            placeholder={exampleJson}
+            className={`w-full h-64 p-4 border rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${inputBg(theme)}`}
+          />
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              ⚠️ {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h4 className="font-semibold text-green-800 mb-2">✅ Import Başarılı!</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500">Toplam Satır:</span>
+                  <p className="font-bold text-green-700">{result.stats.totalRows}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Oluşturulan Ders:</span>
+                  <p className="font-bold text-blue-700">{result.stats.subjectsCreated}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Eklenen Kazanım:</span>
+                  <p className="font-bold text-purple-700">{result.stats.outcomesCreated}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Atlanan Satır:</span>
+                  <p className="font-bold text-orange-700">{result.stats.skippedRows}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleJsonImport}
+            disabled={loading || !jsonText.trim()}
+            className="mt-4 w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? '🔄 İşleniyor...' : '📤 İçe Aktar'}
+          </button>
+        </div>
+      )}
 
       <div className={`mt-6 p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
         <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Mevcut Sınıf Seviyeleri</h3>
