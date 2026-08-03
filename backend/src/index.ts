@@ -14,6 +14,7 @@ import whatsappRouter from './routes/whatsapp.routes';
 import analyticsRouter from './routes/analytics.routes';
 import studentAuthRoutes from './routes/student-auth.routes';
 import studentRoutes from './routes/student.routes';
+import subjectRoutes from './routes/subject.routes';
 import { verifyToken } from './middleware/auth.middleware';
 
 dotenv.config();
@@ -51,6 +52,7 @@ app.use('/api/whatsapp', verifyToken, whatsappRouter); // WhatsApp mesajlaşma -
 app.use('/api/analytics', verifyToken, analyticsRouter); // Analitik - giriş gerektirir
 app.use('/api/student-auth', studentAuthRoutes); // Öğrenci kayıt/giriş/e-posta onayı - herkese açık
 app.use('/api/students', verifyToken, studentRoutes); // Öğrenci onay/listeleme - öğretmen girişi gerektirir
+app.use('/api/subjects', verifyToken, subjectRoutes); // Dersler - giriş gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
