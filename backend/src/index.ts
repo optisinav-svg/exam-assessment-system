@@ -11,6 +11,7 @@ import importRouter from './routes/import.routes';
 import adminRouter from './routes/admin.routes';
 import storageRouter from './routes/storage.routes';
 import whatsappRouter from './routes/whatsapp.routes';
+import analyticsRouter from './routes/analytics.routes';
 import studentAuthRoutes from './routes/student-auth.routes';
 import studentRoutes from './routes/student.routes';
 import { verifyToken } from './middleware/auth.middleware';
@@ -47,6 +48,7 @@ app.use('/api/import', verifyToken, importRouter); // Excel import - giriş gere
 app.use('/api/admin', verifyToken, adminRouter); // Admin paneli - giriş + admin rolü gerektirir
 app.use('/api/storage', verifyToken, storageRouter); // Dosya depolama - giriş gerektirir
 app.use('/api/whatsapp', verifyToken, whatsappRouter); // WhatsApp mesajlaşma - giriş gerektirir
+app.use('/api/analytics', verifyToken, analyticsRouter); // Analitik - giriş gerektirir
 app.use('/api/student-auth', studentAuthRoutes); // Öğrenci kayıt/giriş/e-posta onayı - herkese açık
 app.use('/api/students', verifyToken, studentRoutes); // Öğrenci onay/listeleme - öğretmen girişi gerektirir
 
