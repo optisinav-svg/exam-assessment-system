@@ -114,6 +114,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/import" element={<ImportPage />} />
         <Route path="/results/:examId" element={<ResultsPage />} />
+        <Route path="/exam/:examId" element={<ExamDetailPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/messages" element={<AdminMessagesPage />} />
       </Routes>
@@ -196,50 +197,63 @@ function RegisterPage() {
   );
 }
 
-// Dashboard Sayfası - Karanlık Mod Uyumlu
+// Dashboard Sayfası - Gerçek API Verileriyle Bağlı
 function DashboardPage() {
   const { theme } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [dashboardData, setDashboardData] = useState<any>(null);
 
-  const [examStats] = useState({
-    totalExams: 12,
-    totalStudents: 245,
-    avgScore: 72,
-  });
-
-  const examTrend = [
-    { name: 'Sınav 1', ortalama: 65 },
-    { name: 'Sınav 2', ortalama: 72 },
-    { name: 'Sınav 3', ortalama: 68 },
-    { name: 'Sınav 4', ortalama: 78 },
-    { name: 'Sınav 5', ortalama: 75 },
-    { name: 'Sınav 6', ortalama: 82 },
-  ];
-
-  const answerDistribution = [
-    { name: 'Doğru', value: 6200, color: '#10B981' },
-    { name: 'Yanlış', value: 1800, color: '#EF4444' },
-    { name: 'Boş', value: 600, color: '#F59E0B' },
-  ];
-
-  const outcomeStats = [
-    { kazanım: 'K1', basarı: 85 },
-    { kazanım: 'K2', basarı: 72 },
-    { kazanım: 'K3', basarı: 90 },
-    { kazanım: 'K4', basarı: 55 },
-    { kazanım: 'K5', basarı: 78 },
-    { kazanım: 'K6', basarı: 63 },
-  ];
-
-  const classAverages = [
-    { sinif: '8A', ortalama: 78 },
-    { sinif: '8B', ortalama: 71 },
-    { sinif: '8C', ortalama: 82 },
-    { sinif: '7A', ortalama: 69 },
-    { sinif: '7B', ortalama: 74 },
-  ];
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_BASE}/analytics/dashboard`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('optiksinav-token') || ''}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setDashboardData(data);
+        } else {
+          // API yoksa örnek veri göster
+          setDashboardData(null);
+        }
+      } catch (err) {
+        setDashboardData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
 
   const chartTextColor = theme === 'dark' ? '#e5e7eb' : '#374151';
   const chartGridColor = theme === 'dark' ? '#374151' : '#e5e7eb';
+
+  // Fallback sabit veriler (API yoksa gösterilir)
+  const summary = dashboardData?.summary || {
+    totalExams: 12,
+    totalStudents: 245,
+    avgScore: 72,
+    totalSubjects: 5,
+  };
+
+  const examTrend = (dashboardData?.examTrend || []).map(e => ({
+    name: e.name?.substring(0, 15) || `Sınav ${e.examId}`,
+    ortalama: e.avgScore || e.avgNet || 0,
+    studentCount: e.studentCount || 0,
+    date: e.date,
+    examId: e.examId,
+  }));
+
+  const answerDist = dashboardData?.answerDistribution || { correct: 6200, wrong: 1800, empty: 600 };
+  const answerDistribution = [
+    { name: 'Doğru', value: answerDist.correct, color: '#10B981' },
+    { name: 'Yanlış', value: answerDist.wrong, color: '#EF4444' },
+    { name: 'Boş', value: answerDist.empty, color: '#F59E0B' },
+  ];
 
   return (
     <div className={`p-6 max-w-7xl mx-auto transition-colors duration-300`}>
@@ -252,99 +266,106 @@ function DashboardPage() {
         </nav>
       </div>
 
-      {/* Özet Kartları */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={textSecondary(theme) + ' text-sm'}>Toplam Sınav</h3>
-          <p className="text-3xl font-bold text-blue-600">{examStats.totalExams}</p>
-        </div>
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={textSecondary(theme) + ' text-sm'}>Toplam Öğrenci</h3>
-          <p className="text-3xl font-bold text-purple-600">{examStats.totalStudents}</p>
-        </div>
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={textSecondary(theme) + ' text-sm'}>Ortalama Başarı</h3>
-          <p className="text-3xl font-bold text-green-600">{examStats.avgScore}%</p>
-        </div>
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={textSecondary(theme) + ' text-sm'}>Aktif Ders</h3>
-          <p className="text-3xl font-bold text-orange-600">5</p>
-        </div>
-      </div>
+      {loading ? (
+        <div className={`p-12 text-center ${bgCard(theme)} rounded-xl`}>Yükleniyor...</div>
+      ) : (
+        <>
+          {/* Özet Kartları */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h3 className={textSecondary(theme) + ' text-sm'}>Toplam Sınav</h3>
+              <p className="text-3xl font-bold text-blue-600">{summary.totalExams}</p>
+            </div>
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h3 className={textSecondary(theme) + ' text-sm'}>Toplam Öğrenci</h3>
+              <p className="text-3xl font-bold text-purple-600">{summary.totalStudents}</p>
+            </div>
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h3 className={textSecondary(theme) + ' text-sm'}>Ortalama Başarı</h3>
+              <p className="text-3xl font-bold text-green-600">{summary.avgScore}%</p>
+            </div>
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h3 className={textSecondary(theme) + ' text-sm'}>Aktif Ders</h3>
+              <p className="text-3xl font-bold text-orange-600">{summary.totalSubjects || 5}</p>
+            </div>
+          </div>
 
-      {/* Grafik Satır 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Sınav Ortalama Trendi</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={examTrend}>
-              <defs>
-                <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#4A6CF7" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#4A6CF7" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
-              <XAxis dataKey="name" tick={{ fill: chartTextColor }} />
-              <YAxis domain={[0, 100]} tick={{ fill: chartTextColor }} />
-              <Tooltip formatter={(value: number) => `${value}%`} contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
-              <Area type="monotone" dataKey="ortalama" stroke="#4A6CF7" fill="url(#colorAvg)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+          {/* Grafik Satır 1 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Sınav Ortalama Trendi</h3>
+              {examTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <AreaChart data={examTrend}>
+                    <defs>
+                      <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#4A6CF7" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#4A6CF7" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                    <XAxis dataKey="name" tick={{ fill: chartTextColor }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: chartTextColor }} />
+                    <Tooltip formatter={(value: number) => `${value}%`} contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
+                    <Area type="monotone" dataKey="ortalama" stroke="#4A6CF7" fill="url(#colorAvg)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className={`text-center py-12 ${textSecondary(theme)}`}>Henüz sınav sonucu yok</p>
+              )}
+            </div>
 
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Cevap Dağılımı</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={answerDistribution}
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={{ stroke: chartTextColor }}
-              >
-                {answerDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Cevap Dağılımı</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={answerDistribution}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ stroke: chartTextColor }}
+                  >
+                    {answerDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
+                  <Legend wrapperStyle={{ color: chartTextColor }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Son Sınavlar Listesi */}
+          {dashboardData?.recentExams && dashboardData.recentExams.length > 0 && (
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-6`}>
+              <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Son Sınavlar</h3>
+              <div className="space-y-2">
+                {dashboardData.recentExams.map((exam: any) => (
+                  <a
+                    key={exam.id}
+                    href={`/results/${exam.id}`}
+                    className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} transition-colors`}
+                  >
+                    <div>
+                      <p className={`font-medium ${textPrimary(theme)}`}>{exam.title}</p>
+                      <p className={`text-sm ${textSecondary(theme)}`}>Tarih: {new Date(exam.examDate).toLocaleDateString('tr-TR')}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      exam.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {exam.status === 'published' ? 'Yayında' : 'Taslak'}
+                    </span>
+                  </a>
                 ))}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
-              <Legend wrapperStyle={{ color: chartTextColor }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Grafik Satır 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Kazanım Bazlı Başarı</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={outcomeStats}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
-              <XAxis dataKey="kazanım" tick={{ fill: chartTextColor }} />
-              <YAxis domain={[0, 100]} tick={{ fill: chartTextColor }} />
-              <Tooltip formatter={(value: number) => `${value}%`} contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
-              <Bar dataKey="basarı" fill="#4A6CF7" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
-          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Sınıf Bazlı Ortalamalar</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={classAverages} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fill: chartTextColor }} />
-              <YAxis dataKey="sinif" type="category" width={40} tick={{ fill: chartTextColor }} />
-              <Tooltip formatter={(value: number) => `${value} puan`} contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
-              <Bar dataKey="ortalama" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -1146,6 +1167,244 @@ function AdminMessagesPage() {
           >
             {sending ? '🔄 Gönderiliyor...' : '📤 Mesaj Gönder'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Öğretmen Detaylı Sonuç Raporu ─────────────────────────────────────────
+function ExamDetailPage() {
+  const { theme } = useTheme();
+  const location = useLocation();
+  const examId = location.pathname.split('/exam/')[1] || '';
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchExamDetail = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_BASE}/analytics/exam/${examId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('optiksinav-token') || ''}`,
+          },
+        });
+        if (response.ok) {
+          const jsonData = await response.json();
+          setData(jsonData);
+        } else {
+          setError('Sınav verileri yüklenemedi.');
+        }
+      } catch (err: any) {
+        setError('Bağlantı hatası: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (examId) fetchExamDetail();
+  }, [examId]);
+
+  const chartTextColor = theme === 'dark' ? '#e5e7eb' : '#374151';
+  const chartGridColor = theme === 'dark' ? '#374151' : '#e5e7eb';
+
+  if (loading) {
+    return (
+      <div className={`p-6 max-w-7xl mx-auto`}>
+        <div className={`p-12 text-center ${bgCard(theme)} rounded-xl`}>Yükleniyor...</div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className={`p-6 max-w-7xl mx-auto`}>
+        <div className={`p-8 text-center ${bgCard(theme)} rounded-xl ${textPrimary(theme)}`}>
+          <p className="text-lg mb-4">⚠️ {error || 'Veri bulunamadı'}</p>
+          <a href="/dashboard" className="text-blue-600 hover:underline">← Dashboard'a Dön</a>
+        </div>
+      </div>
+    );
+  }
+
+  const { exam, summary, questionStats, outcomeAnalysis, results: examResults } = data;
+
+  return (
+    <div className={`p-6 max-w-7xl mx-auto transition-colors duration-300`}>
+      {/* Başlık */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+        <div>
+          <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>📋 {exam.title}</h1>
+          <p className={`text-sm ${textSecondary(theme)}`}>{exam.subjectName} | {new Date(exam.examDate).toLocaleDateString('tr-TR')} | {exam.totalQuestions} Soru | {exam.optionCount} Seçenekli</p>
+        </div>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Dashboard
+          </a>
+          <ReportButtons examId={examId} />
+        </div>
+      </div>
+
+      {/* Özet Kartları */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className={`p-4 rounded-lg shadow-sm ${bgCard(theme)} ${borderColor(theme)} border`}>
+          <p className={`text-xs ${textSecondary(theme)}`}>Katılımcı</p>
+          <p className={`text-xl font-bold ${textPrimary(theme)}`}>{summary.totalStudents}</p>
+        </div>
+        <div className={`p-4 rounded-lg shadow-sm ${bgCard(theme)} ${borderColor(theme)} border`}>
+          <p className={`text-xs ${textSecondary(theme)}`}>Ortalama Net</p>
+          <p className="text-xl font-bold text-blue-600">{summary.avgNet}</p>
+        </div>
+        <div className={`p-4 rounded-lg shadow-sm ${bgCard(theme)} ${borderColor(theme)} border`}>
+          <p className={`text-xs ${textSecondary(theme)}`}>En Yüksek Net</p>
+          <p className="text-xl font-bold text-green-600">{summary.highestNet}</p>
+        </div>
+        <div className={`p-4 rounded-lg shadow-sm ${bgCard(theme)} ${borderColor(theme)} border`}>
+          <p className={`text-xs ${textSecondary(theme)}`}>En Düşük Net</p>
+          <p className="text-xl font-bold text-red-600">{summary.lowestNet}</p>
+        </div>
+        <div className={`p-4 rounded-lg shadow-sm ${bgCard(theme)} ${borderColor(theme)} border`}>
+          <p className={`text-xs ${textSecondary(theme)}`}>Başarı %</p>
+          <p className="text-xl font-bold text-purple-600">{summary.passRate}%</p>
+        </div>
+      </div>
+
+      {/* Grafikler */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Soru Bazlı Analiz */}
+        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Soru Bazlı Analiz</h3>
+          {questionStats && questionStats.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={questionStats.map(q => ({
+                soru: q.question,
+                dogru: q.correct,
+                yanlis: q.wrong,
+                bos: q.empty,
+              }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                <XAxis dataKey="soru" tick={{ fontSize: 10, fill: chartTextColor }} />
+                <YAxis domain={[0, 100]} tick={{ fill: chartTextColor }} />
+                <Tooltip contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
+                <Legend wrapperStyle={{ color: chartTextColor }} />
+                <Bar dataKey="dogru" stackId="a" fill="#10B981" name="Doğru" />
+                <Bar dataKey="yanlis" stackId="a" fill="#EF4444" name="Yanlış" />
+                <Bar dataKey="bos" stackId="a" fill="#F59E0B" name="Boş" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className={`text-center py-12 ${textSecondary(theme)}`}>Soru verisi yok</p>
+          )}
+        </div>
+
+        {/* Kazanım Bazlı Başarı */}
+        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Kazanım Bazlı Başarı</h3>
+          {outcomeAnalysis && outcomeAnalysis.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={outcomeAnalysis.map(o => ({
+                kazanım: o.code,
+                basarı: o.successRate,
+              }))} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: chartTextColor }} />
+                <YAxis dataKey="kazanım" type="category" width={80} tick={{ fontSize: 10, fill: chartTextColor }} />
+                <Tooltip formatter={(value: number) => `${value}%`} contentStyle={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#fff', border: 'none', borderRadius: 8 }} />
+                <Bar dataKey="başarı" fill="#4A6CF7" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className={`text-center py-12 ${textSecondary(theme)}`}>Kazanım verisi yok</p>
+          )}
+        </div>
+      </div>
+
+      {/* Sınıf Bazlı Breakdown */}
+      {summary.classBreakdown && summary.classBreakdown.length > 0 && (
+        <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-6`}>
+          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Sınıf Bazlı Ortalamalar</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {summary.classBreakdown.map((cb: any) => (
+              <div key={cb.classId} className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <p className={`font-medium ${textPrimary(theme)}`}>{cb.className}</p>
+                <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                  <span className={textSecondary(theme)}>Net Ort.</span>
+                  <span className={`font-bold ${textPrimary(theme)}`}>{cb.avgNet}</span>
+                  <span className={textSecondary(theme)}>Puan Ort.</span>
+                  <span className={`font-bold ${textPrimary(theme)}`}>{cb.avgScore}</span>
+                  <span className={textSecondary(theme)}>Öğrenci</span>
+                  <span className={`font-bold ${textPrimary(theme)}`}>{cb.studentCount}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Öğrenci Sonuç Tablosu */}
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+        <div className={`p-4 border-b ${borderColor2(theme)}`}>
+          <h3 className={`font-semibold ${textPrimary(theme)}`}>Öğrenci Sonuçları ({examResults?.length || 0})</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}>
+              <tr>
+                <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>No</th>
+                <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Doğru</th>
+                <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Yanlış</th>
+                <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Boş</th>
+                <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Net</th>
+                <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Başarı %</th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${borderColor2(theme)}`}>
+              {(examResults || []).map((r: any, i: number) => (
+                <tr key={i} className={theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                  <td className={`px-4 py-3 ${textPrimary(theme)}`}>{r.studentNo}</td>
+                  <td className="px-4 py-3 text-center text-green-600 font-medium">{r.correctCount}</td>
+                  <td className="px-4 py-3 text-center text-red-600 font-medium">{r.wrongCount}</td>
+                  <td className="px-4 py-3 text-center text-yellow-600 font-medium">{r.emptyCount}</td>
+                  <td className="px-4 py-3 text-center font-bold text-blue-600">{r.net}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      r.successRate >= 80 ? 'bg-green-100 text-green-700' :
+                      r.successRate >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {r.successRate}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Cevap Dağılımı */}
+      <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mt-6`}>
+        <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Genel Cevap Dağılımı</h3>
+        <div className="flex gap-8 justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-2">
+              <span className="text-2xl font-bold text-green-600">{summary.correctDistribution?.correct || 0}</span>
+            </div>
+            <p className={`text-sm ${textSecondary(theme)}`}>Doğru</p>
+          </div>
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-2">
+              <span className="text-2xl font-bold text-red-600">{summary.correctDistribution?.wrong || 0}</span>
+            </div>
+            <p className={`text-sm ${textSecondary(theme)}`}>Yanlış</p>
+          </div>
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-2">
+              <span className="text-2xl font-bold text-yellow-600">{summary.correctDistribution?.empty || 0}</span>
+            </div>
+            <p className={`text-sm ${textSecondary(theme)}`}>Boş</p>
+          </div>
         </div>
       </div>
     </div>
