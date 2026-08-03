@@ -116,3 +116,58 @@ export async function rejectStudent(id: number) {
   const { data } = await api.post(`/students/${id}/reject`);
   return data;
 }
+
+// ─── Dersler ──────────────────────────────────────────────────────────────────
+
+export interface Subject {
+  id: number;
+  name: string;
+  code: string | null;
+  color: string | null;
+}
+
+export async function getSubjects() {
+  const { data } = await api.get<Subject[]>('/subjects');
+  return data;
+}
+
+export async function createSubject(name: string) {
+  const { data } = await api.post<Subject>('/subjects', { name });
+  return data;
+}
+
+// ─── Sınavlar ─────────────────────────────────────────────────────────────────
+
+export interface Exam {
+  id: number;
+  title: string;
+  subjectId: number | null;
+  examDate: string;
+  duration: number | null;
+  totalQuestions: number;
+  correctAnswers: Record<string, string>;
+  optionCount: number;
+  negativeMarking: boolean;
+  status: string;
+  createdAt: string;
+}
+
+export interface CreateExamInput {
+  title: string;
+  subjectId?: number;
+  examDate: string; // ISO tarih (YYYY-MM-DD)
+  totalQuestions: number;
+  correctAnswers: Record<string, string>;
+  optionCount: 3 | 4 | 5;
+  negativeMarking: boolean;
+}
+
+export async function getExams() {
+  const { data } = await api.get<Exam[]>('/exams');
+  return data;
+}
+
+export async function createExam(input: CreateExamInput) {
+  const { data } = await api.post<Exam>('/exams', input);
+  return data;
+}
