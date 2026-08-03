@@ -68,7 +68,9 @@ router.get('/exam/:examId', async (req: Request, res: Response) => {
     // ── Sınıf Bazlı Breakdown ───────────────────────────────────────────────
     // Sınavın hangi sınıflara atandığını bul
     const examClassRelations = await db.select().from(examClasses).where(eq(examClasses.examId, examId));
-    const classIds = examClassRelations.map(ec => ec.classId);
+    const classIds = examClassRelations
+      .map(ec => ec.classId)
+      .filter((id): id is number => id !== null);
 
     let classBreakdown: any[] = [];
     if (classIds.length > 0) {
