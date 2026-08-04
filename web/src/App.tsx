@@ -117,6 +117,7 @@ function AppRoutes() {
         <Route path="/exam/:examId" element={<ExamDetailPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/messages" element={<AdminMessagesPage />} />
+        <Route path="/schools" element={<SchoolsPage />} />
       </Routes>
     </div>
   );
@@ -1603,6 +1604,435 @@ function ExamDetailPage() {
             <p className={`text-sm ${textSecondary(theme)}`}>Boş</p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Okullar & Sınıflar Sayfası ───────────────────────────────────────────
+function SchoolsPage() {
+  const { theme } = useTheme();
+  const [schools, setSchools] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showAddSchool, setShowAddSchool] = useState(false);
+  const [showAddClass, setShowAddClass] = useState<number | null>(null);
+  const [expandedSchoolId, setExpandedSchoolId] = useState<number | null>(null);
+  const [schoolClasses, setSchoolClasses] = useState<Record<number, any[]>>({});
+
+  // Okul ekleme form
+  const [schoolName, setSchoolName] = useState('');
+  const [schoolAddress, setSchoolAddress] = useState('');
+  const [schoolPhone, setSchoolPhone] = useState('');
+  const [schoolLoading, setSchoolLoading] = useState(false);
+  const [schoolSuccess, setSchoolSuccess] = useState(false);
+
+  // Sınıf ekleme form
+  const [className, setClassName] = useState('');
+  const [classGradeLevel, setClassGradeLevel] = useState('');
+  const [classAcademicYear, setClassAcademicYear] = useState('');
+  const [classLoading, setClassLoading] = useState(false);
+  const [classSuccess, setClassSuccess] = useState(false);
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+  const authHeaders = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Okulları yükle
+  const fetchSchools = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/schools`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (response.ok) {
+        const data = await response.json();
+        setSchools(data.schools || []);
+      }
+    } catch (err: any) {
+      setError('Okullar yüklenemedi: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Bir okulun sınıflarını yükle
+  const fetchClasses = async (schoolId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/schools/${schoolId}/classes`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (response.ok) {
+        const data = await response.json();
+        setSchoolClasses(prev => ({ ...prev, [schoolId]: data.classes || [] }));
+      }
+    } catch (err: any) {
+      console.error('Sınıflar yüklenemedi:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchools();
+  }, []);
+
+  // Okul ekleme
+  const handleAddSchool = async () => {
+    if (!schoolName.trim()) return;
+    setSchoolLoading(true);
+    setError('');
+    setSchoolSuccess(false);
+    try {
+      const response = await fetch(`${API_BASE}/schools`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          name: schoolName.trim(),
+          address: schoolAddress.trim() || undefined,
+          phone: schoolPhone.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSchoolSuccess(true);
+        setSchoolName('');
+        setSchoolAddress('');
+        setSchoolPhone('');
+        setShowAddSchool(false);
+        fetchSchools();
+      } else {
+        setError(data.message || 'Okul eklenemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setSchoolLoading(false);
+    }
+  };
+
+  // Okul silme
+  const handleDeleteSchool = async (schoolId: number) => {
+    if (!window.confirm('Bu okulu ve tüm sınıflarını silmek istediğinize emin misiniz?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/schools/${schoolId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        fetchSchools();
+      } else {
+        const data = await response.json();
+        setError(data.message || 'Okul silinemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    }
+  };
+
+  // Sınıf ekleme
+  const handleAddClass = async (schoolId: number) => {
+    if (!className.trim()) return;
+    setClassLoading(true);
+    setError('');
+    setClassSuccess(false);
+    try {
+      const response = await fetch(`${API_BASE}/schools/${schoolId}/classes`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          name: className.trim(),
+          gradeLevel: classGradeLevel.trim() || undefined,
+          academicYear: classAcademicYear.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setClassSuccess(true);
+        setClassName('');
+        setClassGradeLevel('');
+        setClassAcademicYear('');
+        setShowAddClass(null);
+        fetchClasses(schoolId);
+        fetchSchools();
+      } else {
+        setError(data.message || 'Sınıf eklenemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setClassLoading(false);
+    }
+  };
+
+  // Sınıf silme
+  const handleDeleteClass = async (schoolId: number, classId: number) => {
+    if (!window.confirm('Bu sınıfı silmek istediğinize emin misiniz?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/schools/${schoolId}/classes/${classId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        fetchClasses(schoolId);
+        fetchSchools();
+      } else {
+        const data = await response.json();
+        setError(data.message || 'Sınıf silinemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    }
+  };
+
+  // Okul genişletme
+  const toggleSchool = async (schoolId: number) => {
+    if (expandedSchoolId === schoolId) {
+      setExpandedSchoolId(null);
+    } else {
+      setExpandedSchoolId(schoolId);
+      if (!schoolClasses[schoolId]) {
+        await fetchClasses(schoolId);
+      }
+    }
+  };
+
+  return (
+    <div className={`p-6 max-w-5xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>🏫 Okullar & Sınıflar</h1>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Dashboard
+          </a>
+          <button
+            onClick={() => setShowAddSchool(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            + Yeni Okul
+          </button>
+        </div>
+      </div>
+
+      {/* Hata Mesajı */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          ⚠️ {error}
+          <button onClick={() => setError('')} className="ml-2 font-bold">&times;</button>
+        </div>
+      )}
+
+      {/* Okul Ekleme Modal */}
+      {showAddSchool && (
+        <div className={`mb-6 p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <h3 className={`text-lg font-semibold mb-4 ${textMuted(theme)}`}>Yeni Okul Ekle</h3>
+          <div className="space-y-4">
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Okul Adı *</label>
+              <input
+                type="text"
+                value={schoolName}
+                onChange={(e) => setSchoolName(e.target.value)}
+                placeholder="Örn: Atatürk Ortaokulu"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+              />
+            </div>
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Adres</label>
+              <input
+                type="text"
+                value={schoolAddress}
+                onChange={(e) => setSchoolAddress(e.target.value)}
+                placeholder="Örn: Merkez Mah. Eğitim Sok. No:5"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+              />
+            </div>
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Telefon</label>
+              <input
+                type="text"
+                value={schoolPhone}
+                onChange={(e) => setSchoolPhone(e.target.value)}
+                placeholder="Örn: 0(212) 555 1234"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+              />
+            </div>
+
+            {schoolSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                ✅ Okul başarıyla eklendi!
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleAddSchool}
+                disabled={schoolLoading || !schoolName.trim()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {schoolLoading ? '🔄 Ekleniyor...' : '✅ Okul Ekle'}
+              </button>
+              <button
+                onClick={() => { setShowAddSchool(false); setSchoolSuccess(false); }}
+                className={`px-6 py-2 rounded-lg ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Okul Listesi */}
+      {loading ? (
+        <div className={`p-12 text-center ${bgCard(theme)} rounded-xl`}>Yükleniyor...</div>
+      ) : schools.length === 0 ? (
+        <div className={`p-12 text-center ${bgCard(theme)} rounded-xl`}>
+          <p className={`text-lg mb-2 ${textPrimary(theme)}`}>Henüz okul eklenmemiş</p>
+          <p className={`text-sm ${textSecondary(theme)}`}>Yukarıdaki "Yeni Okul" butonuna tıklayarak ilk okulunuzu ekleyin.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {schools.map((school: any) => (
+            <div key={school.id} className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+              {/* Okul Başlığı */}
+              <div
+                className={`flex items-center justify-between p-4 cursor-pointer ${
+                  theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                } transition-colors`}
+                onClick={() => toggleSchool(school.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`transform transition-transform ${expandedSchoolId === school.id ? 'rotate-90' : ''}`}>
+                    ▶
+                  </span>
+                  <div>
+                    <p className={`font-semibold ${textPrimary(theme)}`}>🏫 {school.name}</p>
+                    <div className="flex gap-4 mt-1 text-xs">
+                      {school.address && <span className={textSecondary(theme)}>📍 {school.address}</span>}
+                      {school.phone && <span className={textSecondary(theme)}>📞 {school.phone}</span>}
+                      <span className={textSecondary(theme)}>📚 {school.classCount || 0} sınıf</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteSchool(school.id);
+                  }}
+                  className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs hover:bg-red-200 transition-colors"
+                >
+                  🗑️ Sil
+                </button>
+              </div>
+
+              {/* Sınıflar */}
+              {expandedSchoolId === school.id && (
+                <div className={`border-t ${borderColor2(theme)} p-4`}>
+                  {/* Sınıf Ekleme */}
+                  {showAddClass === school.id ? (
+                    <div className={`p-4 rounded-lg mb-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                      <h4 className={`font-medium mb-3 ${textMuted(theme)}`}>Yeni Sınıf Ekle</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input
+                          type="text"
+                          value={className}
+                          onChange={(e) => setClassName(e.target.value)}
+                          placeholder="Sınıf adı (örn: 8-A)"
+                          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                        />
+                        <input
+                          type="text"
+                          value={classGradeLevel}
+                          onChange={(e) => setClassGradeLevel(e.target.value)}
+                          placeholder="Sınıf seviyesi (örn: 8. Sınıf)"
+                          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                        />
+                        <input
+                          type="text"
+                          value={classAcademicYear}
+                          onChange={(e) => setClassAcademicYear(e.target.value)}
+                          placeholder="Akademik yıl (örn: 2025-2026)"
+                          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                        />
+                      </div>
+                      {classSuccess && (
+                        <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                          ✅ Sınıf başarıyla eklendi!
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleAddClass(school.id)}
+                          disabled={classLoading || !className.trim()}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {classLoading ? '🔄' : '✅ Sınıf Ekle'}
+                        </button>
+                        <button
+                          onClick={() => { setShowAddClass(null); setClassSuccess(false); }}
+                          className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+                        >
+                          İptal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddClass(school.id)}
+                      className="mb-4 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                    >
+                      + Yeni Sınıf
+                    </button>
+                  )}
+
+                  {/* Sınıf Listesi */}
+                  {schoolClasses[school.id] && schoolClasses[school.id].length > 0 ? (
+                    <div className="space-y-2">
+                      <div className={`grid grid-cols-4 gap-4 px-3 py-2 rounded-lg text-xs font-semibold ${
+                        theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <span>Sınıf Adı</span>
+                        <span>Sınıf Seviyesi</span>
+                        <span>Akademik Yıl</span>
+                        <span className="text-right">İşlem</span>
+                      </div>
+                      {schoolClasses[school.id].map((cls: any) => (
+                        <div
+                          key={cls.id}
+                          className={`grid grid-cols-4 gap-4 px-3 py-2 rounded-lg text-sm ${
+                            theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'
+                          }`}
+                        >
+                          <span className={`font-medium ${textPrimary(theme)}`}>{cls.name}</span>
+                          <span className={textSecondary(theme)}>{cls.gradeLevel || '—'}</span>
+                          <span className={textSecondary(theme)}>{cls.academicYear || '—'}</span>
+                          <span className="text-right">
+                            <button
+                              onClick={() => handleDeleteClass(school.id, cls.id)}
+                              className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                            >
+                              🗑️
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className={`text-center py-6 text-sm ${textSecondary(theme)}`}>
+                      Henüz sınıf eklenmemiş
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Bilgi Kartı */}
+      <div className={`mt-8 p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+        <h3 className={`text-sm font-semibold mb-2 ${textMuted(theme)}`}>💡 Bilgi</h3>
+        <p className={`text-sm ${textSecondary(theme)}`}>
+          Okul ve sınıflarınızı burada yönetebilirsiniz. Eklediğiniz okullar, sınav tanımlama ve öğrenci kayıt işlemlerinde kullanılacaktır.
+          Her okul altında birden fazla sınıf oluşturabilirsiniz.
+        </p>
       </div>
     </div>
   );
