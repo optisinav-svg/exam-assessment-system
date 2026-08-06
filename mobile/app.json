@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "OptikSınav",
-    "slug": "optik-sinav",
+    "slug": "optiksinav",
+    "owner": "cografyacii",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
