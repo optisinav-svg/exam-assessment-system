@@ -8,7 +8,7 @@ import * as SecureStore from 'expo-secure-store';
  * yayına aldıktan sonra, size verilen adresi (örn. https://xxx.up.railway.app)
  * aşağıdaki değerin yerine yazmanız yeterlidir.
  */
-export const API_BASE_URL = 'https://REPLACE_WITH_YOUR_BACKEND_URL/api';
+export const API_BASE_URL = 'https://exam-assessment-system-production.up.railway.app/api';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
