@@ -5,14 +5,12 @@ import {
   Text, 
   TouchableOpacity, 
   View,
-  Image,
   Alert,
   ActivityIndicator,
   FlatList,
 } from 'react-native';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -88,83 +86,17 @@ function HomeScreen({ navigation }: any) {
   );
 }
 
-// Optik Okuma Ekranı
-function ScanScreen({ navigation }: any) {
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  const takePhoto = async () => {
-    const response = await launchCamera({ 
-      mediaType: 'photo',
-      quality: 0.8,
-    });
-    
-    if (response.assets && response.assets.length > 0 && response.assets[0].uri) {
-      setImageUri(response.assets[0].uri);
-      processImage(response.assets[0].uri);
-    }
-  };
-
-  const pickImage = async () => {
-    const response = await launchImageLibrary({
-      mediaType: 'photo',
-      quality: 0.8,
-    });
-    
-    if (response.assets && response.assets.length > 0 && response.assets[0].uri) {
-      setImageUri(response.assets[0].uri);
-      processImage(response.assets[0].uri);
-    }
-  };
-
-  const processImage = async (uri: string) => {
-    setLoading(true);
-    try {
-      // OCR işlemi - backend servisine gönderebilirsiniz
-      setResult({
-        text: 'OCR işlemi tamamlandı',
-        answers: ['A', 'B', 'C', 'D'],
-        score: 75,
-      });
-    } catch (error: any) {
-      Alert.alert('Hata', 'Optik okuma başarısız: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+// Optik Okuma Ekranı (v1: gerçek okuma özelliği geliştirme aşamasında)
+function ScanScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.scanContainer}>
-        {imageUri && (
-          <Image source={{ uri: imageUri }} style={styles.previewImage} />
-        )}
-        
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4A6CF7" />
-            <Text style={styles.loadingText}>Okunuyor...</Text>
-          </View>
-        )}
-        
-        {result && (
-          <View style={styles.resultContainer}>
-            <Text style={styles.resultTitle}>Sonuç</Text>
-            <Text style={styles.resultScore}>Puan: {result.score}</Text>
-            <Text style={styles.resultAnswers}>
-              Cevaplar: {result.answers.join(', ')}
-            </Text>
-          </View>
-        )}
-        
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.scanButton} onPress={takePhoto}>
-            <Text style={styles.buttonText}>Fotoğraf Çek</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.scanButton} onPress={pickImage}>
-            <Text style={styles.buttonText}>Galeriden Seç</Text>
-          </TouchableOpacity>
+        <View style={styles.centerMessage}>
+          <Text style={styles.centerMessageIcon}>🚧</Text>
+          <Text style={styles.centerMessageText}>
+            Optik okuma özelliği geliştirme aşamasındadır.{'\n'}
+            Yakında burada olacak.
+          </Text>
         </View>
       </View>
     </SafeAreaView>
