@@ -4,16 +4,19 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/backend/src/index.js",
-    "build": "tsc"
+    "build": "tsc",
+    "db:push": "drizzle-kit push --force"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.31.2",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^9.0.3"
+    "nodemailer": "^9.0.3",
+    "pg": "^8.11.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -24,6 +27,7 @@
     "@types/multer": "^1.4.11",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.5",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.11.0",
     "typescript": "^5.4.5"
   }
