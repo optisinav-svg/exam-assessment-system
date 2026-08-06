@@ -3,13 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
 import { db } from '../index';
 import { uploadedFiles } from '../../../shared/schema';
 import { eq, desc, sql, and } from 'drizzle-orm';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = Router();
 
