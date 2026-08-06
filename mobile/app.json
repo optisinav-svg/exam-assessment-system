@@ -17,11 +17,6 @@
       "package": "com.optisinav.app",
       "versionCode": 1
     },
-    "web": {},
-    "extra": {
-      "eas": {
-        "projectId": ""
-      }
-    }
+    "web": {}
   }
 }
