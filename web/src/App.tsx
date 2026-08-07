@@ -1793,6 +1793,101 @@ function SchoolsPage() {
     }
   };
 
+  // ─── Öğrenci Yönetimi State ───────────────────────────────────────────────
+  const [expandedClassId, setExpandedClassId] = useState<number | null>(null);
+  const [classStudents, setClassStudents] = useState<Record<number, any[]>>({});
+  const [showAddStudent, setShowAddStudent] = useState<number | null>(null);
+  const [studentFirstName, setStudentFirstName] = useState('');
+  const [studentLastName, setStudentLastName] = useState('');
+  const [studentNo, setStudentNo] = useState('');
+  const [studentParentPhone, setStudentParentPhone] = useState('');
+  const [studentLoading, setStudentLoading] = useState(false);
+  const [studentSuccess, setStudentSuccess] = useState(false);
+
+  // Öğrencileri yükle
+  const fetchStudents = async (classId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/roster/classes/${classId}/students`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setClassStudents(prev => ({ ...prev, [classId]: data.students || [] }));
+      }
+    } catch (err: any) {
+      console.error('Öğrenciler yüklenemedi:', err);
+    }
+  };
+
+  // Öğrenci ekleme
+  const handleAddStudent = async (classId: number) => {
+    if (!studentFirstName.trim() || !studentLastName.trim()) return;
+    setStudentLoading(true);
+    setError('');
+    setStudentSuccess(false);
+    try {
+      const response = await fetch(`${API_BASE}/roster/students`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          classId,
+          firstName: studentFirstName.trim(),
+          lastName: studentLastName.trim(),
+          studentNo: studentNo.trim() || undefined,
+          parentPhone: studentParentPhone.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setStudentSuccess(true);
+        setStudentFirstName('');
+        setStudentLastName('');
+        setStudentNo('');
+        setStudentParentPhone('');
+        setShowAddStudent(null);
+        fetchStudents(classId);
+        fetchClasses(schools.find(s => schoolClasses[s.id]?.some(c => c.id === classId))?.id || 0);
+      } else {
+        setError(data.message || 'Öğrenci eklenemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setStudentLoading(false);
+    }
+  };
+
+  // Öğrenci silme
+  const handleDeleteStudent = async (studentId: number, classId: number) => {
+    if (!window.confirm('Bu öğrenciyi silmek istediğinize emin misiniz?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/roster/students/${studentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        fetchStudents(classId);
+      } else {
+        const data = await response.json();
+        setError(data.message || 'Öğrenci silinemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    }
+  };
+
+  // Sınıf genişletme (öğrenci göster)
+  const toggleClassStudents = async (classId: number) => {
+    if (expandedClassId === classId) {
+      setExpandedClassId(null);
+    } else {
+      setExpandedClassId(classId);
+      if (!classStudents[classId]) {
+        await fetchStudents(classId);
+      }
+    }
+  };
+
   return (
     <div className={`p-6 max-w-5xl mx-auto transition-colors duration-300`}>
       <div className="flex items-center justify-between mb-6">
@@ -1994,23 +2089,151 @@ function SchoolsPage() {
                         <span className="text-right">İşlem</span>
                       </div>
                       {schoolClasses[school.id].map((cls: any) => (
-                        <div
-                          key={cls.id}
-                          className={`grid grid-cols-4 gap-4 px-3 py-2 rounded-lg text-sm ${
-                            theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'
-                          }`}
-                        >
-                          <span className={`font-medium ${textPrimary(theme)}`}>{cls.name}</span>
-                          <span className={textSecondary(theme)}>{cls.gradeLevel || '—'}</span>
-                          <span className={textSecondary(theme)}>{cls.academicYear || '—'}</span>
-                          <span className="text-right">
-                            <button
-                              onClick={() => handleDeleteClass(school.id, cls.id)}
-                              className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-                            >
-                              🗑️
-                            </button>
-                          </span>
+                        <div key={cls.id}>
+                          {/* Sınıf Satırı - Tıklanınca öğrenciler görünür */}
+                          <div
+                            className={`grid grid-cols-4 gap-4 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
+                              expandedClassId === cls.id
+                                ? (theme === 'dark' ? 'bg-blue-900/30 border border-blue-500/30' : 'bg-blue-50 border border-blue-200')
+                                : (theme === 'dark' ? 'bg-gray-700/50 hover:bg-gray-600/50' : 'bg-gray-50 hover:bg-gray-100')
+                            }`}
+                            onClick={() => toggleClassStudents(cls.id)}
+                          >
+                            <span className={`font-medium ${textPrimary(theme)}`}>▶ {cls.name}</span>
+                            <span className={textSecondary(theme)}>{cls.gradeLevel || '—'}</span>
+                            <span className={textSecondary(theme)}>{cls.academicYear || '—'}</span>
+                            <span className="text-right flex items-center justify-end gap-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-gray-600 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
+                                👥 {classStudents[cls.id]?.length || 0} öğrenci
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClass(school.id, cls.id);
+                                }}
+                                className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                              >
+                                🗑️
+                              </button>
+                            </span>
+                          </div>
+
+                          {/* Öğrenci Alt Görünümü */}
+                          {expandedClassId === cls.id && (
+                            <div className={`ml-4 mt-2 mb-3 p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700/30 border border-gray-600' : 'bg-white border border-gray-200'}`}>
+                              {/* Öğrenci Ekleme */}
+                              {showAddStudent === cls.id ? (
+                                <div className={`p-3 rounded-lg mb-3 ${theme === 'dark' ? 'bg-gray-600' : 'bg-green-50'}`}>
+                                  <h5 className={`text-sm font-medium mb-2 ${textMuted(theme)}`}>Yeni Öğrenci Ekle</h5>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                                    <input
+                                      type="text"
+                                      value={studentFirstName}
+                                      onChange={(e) => setStudentFirstName(e.target.value)}
+                                      placeholder="Ad *"
+                                      className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={studentLastName}
+                                      onChange={(e) => setStudentLastName(e.target.value)}
+                                      placeholder="Soyad *"
+                                      className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={studentNo}
+                                      onChange={(e) => setStudentNo(e.target.value)}
+                                      placeholder="Okul Numarası"
+                                      className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={studentParentPhone}
+                                      onChange={(e) => setStudentParentPhone(e.target.value)}
+                                      placeholder="Veli Telefonu"
+                                      className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                                    />
+                                  </div>
+                                  {studentSuccess && (
+                                    <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+                                      ✅ Öğrenci eklendi!
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleAddStudent(cls.id)}
+                                      disabled={studentLoading || !studentFirstName.trim() || !studentLastName.trim()}
+                                      className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                      {studentLoading ? '🔄' : '✅ Ekle'}
+                                    </button>
+                                    <button
+                                      onClick={() => { setShowAddStudent(null); setStudentSuccess(false); }}
+                                      className={`px-4 py-1.5 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+                                    >
+                                      İptal
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setShowAddStudent(cls.id)}
+                                  className="mb-3 px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                                >
+                                  + Öğrenci Ekle
+                                </button>
+                              )}
+
+                              {/* Öğrenci Listesi */}
+                              {classStudents[cls.id] && classStudents[cls.id].length > 0 ? (
+                                <div className="space-y-1">
+                                  <div className={`grid grid-cols-5 gap-2 px-2 py-1.5 rounded text-xs font-semibold ${
+                                    theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    <span>Ad Soyad</span>
+                                    <span>No</span>
+                                    <span>Veli Tel</span>
+                                    <span>Durum</span>
+                                    <span className="text-right">İşlem</span>
+                                  </div>
+                                  {classStudents[cls.id].map((student: any) => (
+                                    <div
+                                      key={student.id}
+                                      className={`grid grid-cols-5 gap-2 px-2 py-1.5 rounded text-sm ${
+                                        theme === 'dark' ? 'bg-gray-600/50' : 'bg-gray-50'
+                                      }`}
+                                    >
+                                      <span className={`font-medium ${textPrimary(theme)}`}>
+                                        {student.firstName} {student.lastName}
+                                      </span>
+                                      <span className={textSecondary(theme)}>{student.studentNo || '—'}</span>
+                                      <span className={textSecondary(theme)}>{student.parentPhone || '—'}</span>
+                                      <span>
+                                        <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                          student.isApproved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                          {student.isApproved ? 'Aktif' : 'Beklemede'}
+                                        </span>
+                                      </span>
+                                      <span className="text-right">
+                                        <button
+                                          onClick={() => handleDeleteStudent(student.id, cls.id)}
+                                          className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className={`text-center py-4 text-sm ${textSecondary(theme)}`}>
+                                  Henüz öğrenci yok — "+ Öğrenci Ekle" butonuna tıklayın.
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
