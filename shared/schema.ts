@@ -18,6 +18,7 @@ export const schools = pgTable('schools', {
   name: varchar('name', { length: 255 }).notNull(),
   address: text('address'),
   phone: varchar('phone', { length: 20 }),
+  joinCode: varchar('join_code', { length: 12 }).unique(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -49,6 +50,21 @@ export const students = pgTable('students', {
   isEmailVerified: boolean('is_email_verified').default(false), // e-posta onayı
   emailVerificationToken: varchar('email_verification_token', { length: 255 }),
   profileImage: text('profile_image'),
+});
+
+// Öğrenci Kayıt Geçmişi — bir öğrenci birden fazla öğretmen/sınıfa bağlı
+// olabilir, sınıf değiştirdiğinde eski kayıt kapanır (endDate), yenisi açılır.
+// students.classId / students.teacherId "şu anki / birincil" durumu tutar;
+// bu tablo TAM GEÇMİŞİ tutar, hiçbir kayıt silinmez.
+export const studentEnrollments = pgTable('student_enrollments', {
+  id: serial('id').primaryKey(),
+  studentId: integer('student_id').references(() => students.id).notNull(),
+  classId: integer('class_id').references(() => classes.id).notNull(),
+  teacherId: integer('teacher_id').references(() => users.id).notNull(),
+  status: varchar('status', { length: 20 }).default('active'), // active | transferred | pending
+  joinMethod: varchar('join_method', { length: 20 }), // roster | code | email_request
+  startDate: timestamp('start_date').defaultNow(),
+  endDate: timestamp('end_date'), // null = hâlâ aktif
 });
 
 // Optik Şablonlar

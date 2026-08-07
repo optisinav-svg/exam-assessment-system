@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../index';
 import { students } from '../../../shared/schema';
+import { studentEnrollments } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { sendEmail, studentApprovedEmailHtml } from '../utils/email';
 
@@ -183,6 +184,17 @@ router.post('/:id/approve', async (req: Request, res: Response) => {
       })
       .where(eq(students.id, studentId))
       .returning();
+
+    // Kayıt geçmişi: onaylanan öğrenci için aktif bir kayıt oluştur (sınıf belirtildiyse)
+    if (classId !== undefined) {
+      await db.insert(studentEnrollments).values({
+        studentId,
+        classId,
+        teacherId,
+        status: 'active',
+        joinMethod: 'email_request',
+      });
+    }
 
     if (student.email) {
       await sendEmail(

@@ -105,13 +105,28 @@ export interface StudentRegisterInput {
   password: string;
   fullName: string;
   studentNo?: string;
-  teacherEmail: string;
+  teacherEmail?: string;
+  schoolCode?: string;
+  classId?: number;
 }
 
 export async function studentRegisterRequest(input: StudentRegisterInput) {
   const { data } = await api.post<{ message: string; studentId: number }>(
     '/student-auth/register',
     input
+  );
+  return data;
+}
+
+export interface SchoolLookupResult {
+  schoolId: number;
+  schoolName: string;
+  classes: { id: number; name: string }[];
+}
+
+export async function lookupSchoolByCode(code: string) {
+  const { data } = await api.get<SchoolLookupResult>(
+    `/student-auth/school-lookup/${encodeURIComponent(code.trim().toUpperCase())}`
   );
   return data;
 }

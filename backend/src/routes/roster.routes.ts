@@ -1,6 +1,6 @@
 import express from 'express';
 import { eq, and } from 'drizzle-orm';
-import { students, classes, schools } from '../../../shared/schema';
+import { students, classes, schools, studentEnrollments } from '../../../shared/schema';
 import { db } from '../index';
 
 const router = express.Router();
@@ -61,6 +61,14 @@ router.post('/students', async (req: any, res: express.Response) => {
         isActive: true,
       })
       .returning();
+
+    await db.insert(studentEnrollments).values({
+      studentId: newStudent.id,
+      classId: parseInt(classId),
+      teacherId,
+      status: 'active',
+      joinMethod: 'roster',
+    });
 
     res.status(201).json({
       success: true,
@@ -196,6 +204,110 @@ router.delete('/students/:id', async (req: any, res: express.Response) => {
     });
   } catch (error) {
     console.error('Öğrenci silme hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// PUT /api/roster/students/:id/transfer — Öğrenciyi başka bir sınıfa geçir
+// (geçmiş kaybolmaz: eski kayıt "transferred" olarak kapanır, yenisi açılır)
+router.put('/students/:id/transfer', async (req: any, res: express.Response) => {
+  try {
+    const teacherId = req.user?.id;
+    const studentId = parseInt(req.params.id);
+    const { newClassId } = req.body;
+
+    if (!teacherId) {
+      return res.status(401).json({ message: 'Kimlik doğrulama gerekli' });
+    }
+    if (!newClassId) {
+      return res.status(400).json({ message: 'newClassId zorunludur' });
+    }
+
+    const [student] = await db.select().from(students).where(eq(students.id, studentId));
+    if (!student) {
+      return res.status(404).json({ message: 'Öğrenci bulunamadı' });
+    }
+
+    // Yeni sınıfın, isteği yapan öğretmene ait olduğunu doğrula
+    const [cls] = await db.select().from(classes).where(eq(classes.id, parseInt(newClassId)));
+    if (!cls || cls.schoolId === null) {
+      return res.status(404).json({ message: 'Yeni sınıf bulunamadı' });
+    }
+    const [school] = await db.select().from(schools).where(eq(schools.id, cls.schoolId));
+    if (!school || school.teacherId !== teacherId) {
+      return res.status(403).json({ message: 'Bu sınıfa geçiş yapma yetkiniz yok' });
+    }
+
+    const oldClassId = student.classId;
+
+    // 1) Öğrencinin "şu anki" sınıf/öğretmen bilgisini güncelle
+    const [updated] = await db
+      .update(students)
+      .set({ classId: cls.id, teacherId: school.teacherId })
+      .where(eq(students.id, studentId))
+      .returning();
+
+    // 2) Eski aktif kaydı varsa kapat (geçmiş olarak kalır)
+    if (oldClassId !== null) {
+      await db
+        .update(studentEnrollments)
+        .set({ status: 'transferred', endDate: new Date() })
+        .where(
+          and(
+            eq(studentEnrollments.studentId, studentId),
+            eq(studentEnrollments.classId, oldClassId),
+            eq(studentEnrollments.status, 'active')
+          )
+        );
+    }
+
+    // 3) Yeni kaydı aç
+    await db.insert(studentEnrollments).values({
+      studentId,
+      classId: cls.id,
+      teacherId: school.teacherId!,
+      status: 'active',
+      joinMethod: 'roster',
+    });
+
+    res.json({
+      success: true,
+      message: 'Öğrenci yeni sınıfa aktarıldı, geçmiş kaydı korundu',
+      student: updated,
+    });
+  } catch (error) {
+    console.error('Sınıf geçişi hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// GET /api/roster/students/:id/history — Öğrencinin sınıf/öğretmen geçmişi
+router.get('/students/:id/history', async (req: any, res: express.Response) => {
+  try {
+    const teacherId = req.user?.id;
+    const studentId = parseInt(req.params.id);
+    if (!teacherId) {
+      return res.status(401).json({ message: 'Kimlik doğrulama gerekli' });
+    }
+
+    const history = await db
+      .select({
+        id: studentEnrollments.id,
+        classId: studentEnrollments.classId,
+        className: classes.name,
+        status: studentEnrollments.status,
+        joinMethod: studentEnrollments.joinMethod,
+        startDate: studentEnrollments.startDate,
+        endDate: studentEnrollments.endDate,
+      })
+      .from(studentEnrollments)
+      .leftJoin(classes, eq(studentEnrollments.classId, classes.id))
+      .where(eq(studentEnrollments.studentId, studentId))
+      .orderBy(studentEnrollments.startDate);
+
+    res.json({ success: true, history });
+  } catch (error) {
+    console.error('Geçmiş getirme hatası:', error);
     res.status(500).json({ message: 'Sunucu hatası' });
   }
 });

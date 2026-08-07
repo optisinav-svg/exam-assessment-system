@@ -59,6 +59,21 @@ router.post('/', async (req: any, res: express.Response) => {
       return res.status(400).json({ message: 'Okul adı zorunludur' });
     }
 
+    // Benzersiz, kolay okunur bir katılım kodu üret (örn. AB3X9K)
+    function generateJoinCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // karışabilecek 0/O, 1/I çıkarıldı
+      let code = '';
+      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+    let joinCode = generateJoinCode();
+    // Çakışma ihtimaline karşı (çok düşük ama) kontrol
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const existing = await db.select().from(schools).where(eq(schools.joinCode, joinCode));
+      if (existing.length === 0) break;
+      joinCode = generateJoinCode();
+    }
+
     const [newSchool] = await db
       .insert(schools)
       .values({
@@ -66,6 +81,7 @@ router.post('/', async (req: any, res: express.Response) => {
         name: name.trim(),
         address: address?.trim() || null,
         phone: phone?.trim() || null,
+        joinCode,
       })
       .returning();
 
