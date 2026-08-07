@@ -12,13 +12,35 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../services/api';
+import {
+  UserRole,
+  getRememberedCredentials,
+  saveRememberedCredentials,
+  clearRememberedCredentials,
+} from '../services/api';
 
 export default function LoginScreen({ navigation }: any) {
   const { login, isSubmitting } = useAuth();
   const [role, setRole] = useState<UserRole>('teacher');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const saved = await getRememberedCredentials();
+        if (saved) {
+          setEmail(saved.email);
+          setPassword(saved.password);
+          setRole(saved.role);
+          setRememberMe(true);
+        }
+      } catch (error) {
+        console.warn('Kayıtlı giriş bilgileri okunamadı:', error);
+      }
+    })();
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -27,6 +49,11 @@ export default function LoginScreen({ navigation }: any) {
     }
     try {
       await login(email.trim(), password, role);
+      if (rememberMe) {
+        await saveRememberedCredentials({ email: email.trim(), password, role });
+      } else {
+        await clearRememberedCredentials();
+      }
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
@@ -38,7 +65,7 @@ export default function LoginScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -89,6 +116,17 @@ export default function LoginScreen({ navigation }: any) {
             secureTextEntry
             editable={!isSubmitting}
           />
+
+          <TouchableOpacity
+            style={styles.rememberRow}
+            onPress={() => setRememberMe(!rememberMe)}
+            disabled={isSubmitting}
+          >
+            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+              {rememberMe && <Text style={styles.checkboxTick}>✓</Text>}
+            </View>
+            <Text style={styles.rememberText}>Beni hatırla</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, isSubmitting && styles.buttonDisabled]}
@@ -203,6 +241,34 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#FAFAFA',
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#C7D2FE',
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#4A6CF7',
+    borderColor: '#4A6CF7',
+  },
+  checkboxTick: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  rememberText: {
+    fontSize: 14,
+    color: '#444',
   },
   button: {
     backgroundColor: '#4A6CF7',

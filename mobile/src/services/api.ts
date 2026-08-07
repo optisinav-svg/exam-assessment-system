@@ -40,6 +40,28 @@ export async function clearToken() {
   await SecureStore.deleteItemAsync(USER_KEY);
 }
 
+// ─── Beni Hatırla ───────────────────────────────────────────────────────────
+const REMEMBER_KEY = 'remember_credentials';
+
+export interface RememberedCredentials {
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
+export async function saveRememberedCredentials(creds: RememberedCredentials) {
+  await SecureStore.setItemAsync(REMEMBER_KEY, JSON.stringify(creds));
+}
+
+export async function getRememberedCredentials(): Promise<RememberedCredentials | null> {
+  const raw = await SecureStore.getItemAsync(REMEMBER_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function clearRememberedCredentials() {
+  await SecureStore.deleteItemAsync(REMEMBER_KEY);
+}
+
 export async function saveUser(user: AuthUser) {
   await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
 }
@@ -54,6 +76,7 @@ export interface AuthUser {
   email: string;
   fullName: string;
   role: string;
+  profileImage?: string | null;
 }
 
 export type UserRole = 'teacher' | 'student';
@@ -114,6 +137,32 @@ export async function approveStudent(id: number, options?: { classId?: number; s
 
 export async function rejectStudent(id: number) {
   const { data } = await api.post(`/students/${id}/reject`);
+  return data;
+}
+
+// ─── Profil ───────────────────────────────────────────────────────────────────
+
+export async function getMyProfile(role: UserRole) {
+  const endpoint = role === 'teacher' ? '/auth/me' : '/students/me';
+  const { data } = await api.get<AuthUser>(endpoint);
+  return data;
+}
+
+export async function updateMyProfile(
+  role: UserRole,
+  input: { fullName?: string; profileImage?: string }
+) {
+  const endpoint = role === 'teacher' ? '/auth/profile' : '/students/me/profile';
+  const { data } = await api.put<AuthUser>(endpoint, input);
+  return data;
+}
+
+export async function updateMyPassword(
+  role: UserRole,
+  input: { currentPassword: string; newPassword: string }
+) {
+  const endpoint = role === 'teacher' ? '/auth/password' : '/students/me/password';
+  const { data } = await api.put<{ message: string }>(endpoint, input);
   return data;
 }
 

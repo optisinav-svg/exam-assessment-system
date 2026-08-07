@@ -86,4 +86,87 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/auth/me ─────────────────────────────────────────────────────
+// Giriş yapmış öğretmenin kendi profil bilgilerini getirir
+router.get('/me', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+    res.json({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      profileImage: user.profileImage,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Profil getirilirken hata oluştu', error: error.message });
+  }
+});
+
+// ─── PUT /api/auth/profile ────────────────────────────────────────────────
+// Ad-soyad ve/veya profil fotoğrafını günceller
+router.put('/profile', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { fullName, profileImage } = req.body;
+
+    const updates: Record<string, any> = {};
+    if (fullName !== undefined) updates.fullName = fullName;
+    if (profileImage !== undefined) updates.profileImage = profileImage;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'Güncellenecek bir alan gönderilmedi.' });
+    }
+
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, userId)).returning();
+
+    res.json({
+      id: updated.id,
+      email: updated.email,
+      fullName: updated.fullName,
+      role: updated.role,
+      profileImage: updated.profileImage,
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Profil güncellenirken hata oluştu', error: error.message });
+  }
+});
+
+// ─── PUT /api/auth/password ───────────────────────────────────────────────
+// Mevcut şifreyi doğrulayıp yeni şifreyi kaydeder
+router.put('/password', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Mevcut ve yeni şifre gereklidir.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Yeni şifre en az 6 karakter olmalıdır.' });
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(401).json({ message: 'Mevcut şifre hatalı.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+
+    res.json({ message: 'Şifre başarıyla güncellendi.' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Şifre güncellenirken hata oluştu', error: error.message });
+  }
+});
+
 export default router;

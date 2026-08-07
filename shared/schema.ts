@@ -7,6 +7,7 @@ export const users = pgTable('users', {
   password: text('password').notNull(),
   fullName: varchar('full_name', { length: 255 }).notNull(),
   role: varchar('role', { length: 50 }).default('teacher'),
+  profileImage: text('profile_image'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -47,6 +48,7 @@ export const students = pgTable('students', {
   isApproved: boolean('is_approved').default(false), // öğretmen onayı
   isEmailVerified: boolean('is_email_verified').default(false), // e-posta onayı
   emailVerificationToken: varchar('email_verification_token', { length: 255 }),
+  profileImage: text('profile_image'),
 });
 
 // Optik Şablonlar

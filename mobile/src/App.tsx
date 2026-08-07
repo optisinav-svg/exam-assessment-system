@@ -17,6 +17,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import StudentRegisterScreen from './screens/StudentRegisterScreen';
 import PendingStudentsScreen from './screens/PendingStudentsScreen';
 import CreateExamScreen from './screens/CreateExamScreen';
+import ProfileScreen from './screens/ProfileScreen';
 import { getExams, Exam } from './services/api';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -72,6 +73,11 @@ function HomeScreen({ navigation }: any) {
             <Text style={styles.menuIcon}>🎓</Text>
             <Text style={styles.menuText}>Bekleyen{'\n'}Öğrenciler</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Profile')}>
+            <Text style={styles.menuIcon}>👤</Text>
+            <Text style={styles.menuText}>Profil</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.centerMessage}>
@@ -80,6 +86,12 @@ function HomeScreen({ navigation }: any) {
             Öğrenci paneli yakında burada olacak.{'\n'}
             Sonuçlarını ve kazanımlarını yakında buradan görebileceksin.
           </Text>
+          <TouchableOpacity
+            style={styles.profileLinkButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Text style={styles.profileLinkButtonText}>👤 Profilim</Text>
+          </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
@@ -200,6 +212,7 @@ function MainNavigator() {
       <Stack.Screen name="Exams" component={ExamsScreen} />
       <Stack.Screen name="CreateExam" component={CreateExamScreen} />
       <Stack.Screen name="PendingStudents" component={PendingStudentsScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
     </Stack.Navigator>
   );
 }
@@ -358,6 +371,18 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  profileLinkButton: {
+    marginTop: 24,
+    backgroundColor: '#4A6CF7',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  profileLinkButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   scanContainer: {
     flex: 1,

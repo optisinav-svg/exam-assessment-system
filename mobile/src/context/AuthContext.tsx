@@ -28,26 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Uygulama açıldığında, cihazda daha önce kaydedilmiş bir oturum var mı bak.
-    // NOT: Cihazda ekran kilidi/güvenli depolama yoksa SecureStore hata verebilir,
-    // bu durumda çökme yerine "oturum yok" kabul edip devam ediyoruz.
-    (async () => {
-      try {
-        const token = await getToken();
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
-        const storedUser = await getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
-        }
-      } catch (error) {
-        console.warn('Kayıtlı oturum okunamadı:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    // Kullanıcı tercihi: uygulama her açıldığında giriş ekranı gösterilsin,
+    // önceki oturum otomatik açılmasın. "Beni Hatırla" işaretliyse
+    // LoginScreen, kayıtlı e-posta/şifreyi kendisi doldurur (bkz. api.ts).
+    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string, role: UserRole = 'teacher') => {
