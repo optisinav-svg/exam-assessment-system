@@ -19,6 +19,7 @@ import studentAuthRoutes from './routes/student-auth.routes';
 import studentRoutes from './routes/student.routes';
 import subjectRoutes from './routes/subject.routes';
 import { verifyToken } from './middleware/auth.middleware';
+import { seedKazanimlar } from './seed-kazanimlar';
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
+  seedKazanimlar();
 });
 
 export { db };

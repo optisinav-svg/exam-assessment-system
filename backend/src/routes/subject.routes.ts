@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../index';
-import { subjects } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { subjects, learningOutcomes } from '../../../shared/schema';
+import { eq, and, ilike } from 'drizzle-orm';
 
 const router = Router();
 
@@ -52,6 +52,36 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Subject create error:', error);
     res.status(500).json({ message: 'Ders oluşturulurken hata oluştu', error: error.message });
+  }
+});
+
+// ─── GET /api/subjects/:id/learning-outcomes/search?q=... ────────────────────
+// Sınav oluştururken, yazılan birkaç harfe göre uygun kazanımları önerir.
+router.get('/:id/learning-outcomes/search', async (req: Request, res: Response) => {
+  try {
+    const subjectId = parseInt(req.params.id);
+    const q = String(req.query.q || '').trim();
+    const gradeLevel = req.query.gradeLevel ? String(req.query.gradeLevel) : undefined;
+
+    if (q.length < 2) {
+      return res.json([]); // çok kısa aramada sonuç dönme (performans + gürültü)
+    }
+
+    const conditions = [eq(learningOutcomes.subjectId, subjectId), ilike(learningOutcomes.description, `%${q}%`)];
+    if (gradeLevel) {
+      conditions.push(eq(learningOutcomes.gradeLevel, gradeLevel));
+    }
+
+    const outcomes = await db
+      .select()
+      .from(learningOutcomes)
+      .where(and(...conditions))
+      .limit(25);
+
+    res.json(outcomes);
+  } catch (error: any) {
+    console.error('Learning outcome search error:', error);
+    res.status(500).json({ message: 'Kazanım aranırken hata oluştu', error: error.message });
   }
 });
 

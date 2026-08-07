@@ -127,6 +127,7 @@ export const exams = pgTable('exams', {
   optionCount: integer('option_count').default(4), // 3, 4 veya 5 seçenekli
   negativeMarking: boolean('negative_marking').default(true), // yanlış doğruyu eksiltsin mi
   status: varchar('status', { length: 50 }).default('draft'),
+  totalScore: integer('total_score').default(100), // sınavın tam puanı (tüm sorular doğru olursa)
   examType: varchar('exam_type', { length: 20 }), // 'TYT' | 'AYT' | 'LGS' | 'custom'
   // AYT sınavı, hangi TYT sınavının netleriyle birlikte puanlanacaksa onu gösterir.
   // (TYT ve AYT ayrı günlerde uygulanır; puan hesaplaması ikisinin netlerini birlikte kullanır.
@@ -147,6 +148,7 @@ export const examClasses = pgTable('exam_classes', {
 export const results = pgTable('results', {
   id: serial('id').primaryKey(),
   examId: integer('exam_id').references(() => exams.id),
+  studentId: integer('student_id').references(() => students.id), // zaman içi analiz için
   studentNo: varchar('student_no', { length: 50 }),
   answers: jsonb('answers').notNull(),
   score: integer('score'),
@@ -159,7 +161,28 @@ export const results = pgTable('results', {
   status: varchar('status', { length: 50 }).default('pending'),
 });
 
-// Sistem Mesajları (Admin tarafından gönderilen)
+// Sınav Soruları — her sorunun hangi derse ve hangi kazanıma ait olduğunu
+// tutar. Çok derslik sınavlarda (TYT/AYT/LGS gibi) her soru farklı derse
+// ait olabilir; bu yüzden ders/kazanım bilgisi sınav (exams) seviyesinde
+// değil, SORU seviyesinde tutuluyor.
+export const examQuestions = pgTable('exam_questions', {
+  id: serial('id').primaryKey(),
+  examId: integer('exam_id').references(() => exams.id).notNull(),
+  questionNumber: integer('question_number').notNull(),
+  subjectId: integer('subject_id').references(() => subjects.id),
+  learningOutcomeId: integer('learning_outcome_id').references(() => learningOutcomes.id),
+  customOutcomeText: text('custom_outcome_text'), // öğretmen kendi yazdıysa (hazır listede yoksa)
+  correctAnswer: varchar('correct_answer', { length: 1 }).notNull(),
+});
+
+// Soru Bazlı Öğrenci Cevapları — kazanım/ders bazlı analiz burada hesaplanır.
+export const resultQuestionAnswers = pgTable('result_question_answers', {
+  id: serial('id').primaryKey(),
+  resultId: integer('result_id').references(() => results.id).notNull(),
+  examQuestionId: integer('exam_question_id').references(() => examQuestions.id).notNull(),
+  studentAnswer: varchar('student_answer', { length: 1 }), // null = boş bırakılmış
+  isCorrect: boolean('is_correct'),
+});
 export const messages = pgTable('messages', {
   id: serial('id').primaryKey(),
   senderId: integer('sender_id').references(() => users.id),
