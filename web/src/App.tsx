@@ -1877,6 +1877,82 @@ function SchoolsPage() {
     }
   };
 
+  // ─── Sınıf Geçişi ve Geçmiş State ────────────────────────────────────────
+  const [showTransferModal, setShowTransferModal] = useState<number | null>(null); // öğrenci id
+  const [transferSelectedClassId, setTransferSelectedClassId] = useState<number | null>(null);
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState<number | null>(null); // öğrenci id
+  const [studentHistory, setStudentHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Tüm sınıfları al (transfer için)
+  const getAllClasses = (): any[] => {
+    const allClasses: any[] = [];
+    Object.values(schoolClasses).forEach(classes => {
+      allClasses.push(...classes);
+    });
+    return allClasses;
+  };
+
+  // Öğrenciyi sınıfa aktar
+  const handleTransferStudent = async (studentId: number) => {
+    if (!transferSelectedClassId) return;
+    setTransferLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/roster/students/${studentId}/transfer`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ newClassId: transferSelectedClassId }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setShowTransferModal(null);
+        setTransferSelectedClassId(null);
+        // Öğrenci listesini yenile
+        const oldClass = Object.keys(schoolClasses).find(k =>
+          schoolClasses[parseInt(k)]?.some(c => c.id === studentId) // Not: student değil class
+        );
+        // Tüm genişletilmiş sınıfların öğrencilerini yenile
+        if (expandedClassId) {
+          await fetchStudents(expandedClassId);
+        }
+        fetchSchools();
+      } else {
+        setError(data.message || 'Sınıf aktarımı başarısız');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  // Öğrenci geçmişini yükle
+  const fetchStudentHistory = async (studentId: number) => {
+    setShowHistoryModal(studentId);
+    setHistoryLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/roster/students/${studentId}/history`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStudentHistory(data.history || []);
+      } else {
+        const data = await response.json();
+        setError(data.message || 'Geçmiş yüklenemedi');
+        setStudentHistory([]);
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+      setStudentHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   // Sınıf genişletme (öğrenci göster)
   const toggleClassStudents = async (classId: number) => {
     if (expandedClassId === classId) {
@@ -2217,10 +2293,28 @@ function SchoolsPage() {
                                           {student.isApproved ? 'Aktif' : 'Beklemede'}
                                         </span>
                                       </span>
-                                      <span className="text-right">
+                                      <span className="text-right flex items-center justify-end gap-1">
+                                        <button
+                                          onClick={() => {
+                                            setShowTransferModal(student.id);
+                                            setTransferSelectedClassId(null);
+                                          }}
+                                          title="Sınıf Değiştir"
+                                          className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+                                        >
+                                          🔄
+                                        </button>
+                                        <button
+                                          onClick={() => fetchStudentHistory(student.id)}
+                                          title="Geçmiş"
+                                          className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200"
+                                        >
+                                          📋
+                                        </button>
                                         <button
                                           onClick={() => handleDeleteStudent(student.id, cls.id)}
-                                          className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                                          title="Sil"
+                                          className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
                                         >
                                           🗑️
                                         </button>
@@ -2250,12 +2344,114 @@ function SchoolsPage() {
         </div>
       )}
 
+      {/* Sınıf Değiştirme Modal */}
+      {showTransferModal !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`max-w-md w-full p-6 rounded-xl shadow-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
+            <h3 className={`text-lg font-semibold mb-4 ${textPrimary(theme)}`}>🔄 Sınıf Değiştir</h3>
+            <p className={`text-sm mb-4 ${textSecondary(theme)}`}>
+              Öğrenciyi aşağıdaki sınıflardan birine aktarın:
+            </p>
+
+            <select
+              value={transferSelectedClassId || ''}
+              onChange={(e) => setTransferSelectedClassId(e.target.value ? parseInt(e.target.value) : null)}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+            >
+              <option value="">-- Sınıf Seçin --</option>
+              {getAllClasses().map(cls => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name} {cls.gradeLevel ? `(${cls.gradeLevel})` : ''}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => handleTransferStudent(showTransferModal)}
+                disabled={transferLoading || !transferSelectedClassId}
+                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                {transferLoading ? '🔄 Aktarılıyor...' : '✅ Aktar'}
+              </button>
+              <button
+                onClick={() => { setShowTransferModal(null); setTransferSelectedClassId(null); }}
+                className={`px-5 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Öğrenci Geçmişi Modal */}
+      {showHistoryModal !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`max-w-lg w-full p-6 rounded-xl shadow-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${textPrimary(theme)}`}>📋 Öğrenci Geçmişi</h3>
+              <button
+                onClick={() => setShowHistoryModal(null)}
+                className={`text-xl ${textSecondary(theme)} hover:text-red-500`}
+              >
+                &times;
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <p className={`text-center py-8 ${textSecondary(theme)}`}>Yükleniyor...</p>
+            ) : studentHistory.length === 0 ? (
+              <p className={`text-center py-8 ${textSecondary(theme)}`}>Geçmiş kaydı bulunamadı.</p>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {studentHistory.map((h: any, index: number) => (
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`font-medium text-sm ${textPrimary(theme)}`}>
+                        🏫 {h.className || h.schoolName || '—'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        h.isActive
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {h.isActive ? 'Aktif' : 'Geçmiş'}
+                      </span>
+                    </div>
+                    <div className={`text-xs ${textSecondary(theme)}`}>
+                      <span>📅 Başlangıç: {h.startDate ? new Date(h.startDate).toLocaleDateString('tr-TR') : '—'}</span>
+                      {' | '}
+                      <span>Bitiş: {h.endDate ? new Date(h.endDate).toLocaleDateString('tr-TR') : 'Devam ediyor'}</span>
+                    </div>
+                    {h.method && (
+                      <p className={`text-xs mt-1 ${textMuted(theme)}`}>Katılım: {h.method}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowHistoryModal(null)}
+              className={`mt-4 w-full py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bilgi Kartı */}
       <div className={`mt-8 p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
         <h3 className={`text-sm font-semibold mb-2 ${textMuted(theme)}`}>💡 Bilgi</h3>
         <p className={`text-sm ${textSecondary(theme)}`}>
           Okul ve sınıflarınızı burada yönetebilirsiniz. Eklediğiniz okullar, sınav tanımlama ve öğrenci kayıt işlemlerinde kullanılacaktır.
-          Her okul altında birden fazla sınıf oluşturabilirsiniz.
+          Her okul altında birden fazla sınıf oluşturabilirsiniz. Öğrenci satırındaki 🔄 butonu ile sınıf değiştirebilir,
+          📋 butonu ile öğrencinin geçmişini görebilirsiniz.
         </p>
       </div>
     </div>
