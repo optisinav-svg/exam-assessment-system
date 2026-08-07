@@ -119,6 +119,7 @@ function AppRoutes() {
           <Route path="/admin/messages" element={<AdminMessagesPage />} />
         <Route path="/schools" element={<SchoolsPage />} />
         <Route path="/score-coefficients" element={<ScoreCoefficientsPage />} />
+        <Route path="/score-calculator" element={<ScoreCalculatorPage />} />
       </Routes>
     </div>
   );
@@ -2736,6 +2737,370 @@ function ScoreCoefficientsPage() {
           Bu katsayılar, öğrencilerin TYT/AYT/LGS puanlarının hesaplanmasında kullanılır.
           Her yıl ÖSYM tarafından yayınlanan yeni katsayıları buraya girebilirsiniz.
           Aynı sınav türü ve yıl kombinasyonu için yeni kayıt eklemek yerine mevcut kayıtlar güncellenir.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── TYT/AYT/LGS Puan Hesaplama Sayfası (Public — Giriş Gerektirmez) ─────
+function ScoreCalculatorPage() {
+  const { theme } = useTheme();
+  const [examType, setExamType] = useState('TYT');
+  const [nets, setNets] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const [comparison, setComparison] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjectsLoaded, setSubjectsLoaded] = useState(false);
+
+  const currentYear = new Date().getFullYear();
+
+  // Varsayılan dersler (katsayı verisi yoksa fallback)
+  const defaultSubjects: Record<string, string[]> = {
+    TYT: ['turkce', 'matematik', 'sosyal', 'fen'],
+    AYT: ['matematik', 'fizik', 'kimya', 'biyoloji', 'tarih1', 'tarih2', 'cografya1', 'cografya2', 'felsefe', 'din'],
+    LGS: ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'],
+  };
+
+  const subjectLabels: Record<string, string> = {
+    turkce: '📖 Türkçe',
+    matematik: '📐 Matematik',
+    sosyal: '🌍 Sosyal Bilimler',
+    fen: '🔬 Fen Bilimleri',
+    fizik: '⚡ Fizik',
+    kimya: '⚗️ Kimya',
+    biyoloji: '🧬 Biyoloji',
+    tarih1: '📜 Tarih-1',
+    tarih2: '📜 Tarih-2',
+    cografya1: '🗺️ Coğrafya-1',
+    cografya2: '🗺️ Coğrafya-2',
+    felsefe: '💭 Felsefe',
+    din: '☪️ Din Kültürü',
+    ingilizce: '🇬🇧 İngilizce',
+    inkilap: '🏛️ İnkılap Tarihi',
+  };
+
+  // Sınav türü değişince dersleri yükle
+  useEffect(() => {
+    loadSubjects();
+    setResult(null);
+    setComparison([]);
+  }, [examType]);
+
+  const loadSubjects = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `${API_BASE}/score-coefficients?examType=${examType}&year=${currentYear}`,
+        { headers: { 'Authorization': `Bearer ${localStorage.getItem('optiksinav-token') || ''}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.coefficients && data.coefficients.length > 0) {
+          const subjectList = data.coefficients.map((c: any) => c.subjectCode);
+          setSubjects(subjectList);
+          // Nets'i güncelle (mevcut değerleri koru)
+          setNets(prev => {
+            const newNets: Record<string, string> = {};
+            subjectList.forEach(s => {
+              newNets[s] = prev[s] || '';
+            });
+            return newNets;
+          });
+          setSubjectsLoaded(true);
+        } else {
+          setSubjects(defaultSubjects[examType] || []);
+          setSubjectsLoaded(false);
+        }
+      } else {
+        setSubjects(defaultSubjects[examType] || []);
+        setSubjectsLoaded(false);
+      }
+    } catch (err: any) {
+      setSubjects(defaultSubjects[examType] || []);
+      setSubjectsLoaded(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Net değeri değişince
+  const handleNetChange = (subjectCode: string, value: string) => {
+    setNets(prev => ({ ...prev, [subjectCode]: value }));
+  };
+
+  // Puan hesapla (verilen yılın katsayıları ile)
+  const calculateForYear = async (year: number, coefficients: any[]) => {
+    const coeffs = coefficients.find((c: any) => c.year === year);
+    if (!coeffs) return null;
+
+    const coeffMap = new Map();
+    coeffs.forEach((c: any) => coeffMap.set(c.subjectCode, c));
+
+    // Ham puan hesapla
+    let hamPuan = 0;
+    let hasData = false;
+    for (const subject of subjects) {
+      const net = parseFloat(nets[subject] || '0');
+      const coeff = coeffMap.get(subject);
+      if (coeff && coeff.coefficient) {
+        hamPuan += net * parseFloat(coeff.coefficient);
+        hasData = true;
+      }
+    }
+
+    if (!hasData) return null;
+
+    // İlk dersin ortalama ve standart sapmasını kullan
+    const firstCoeff = coeffs[0];
+    const average = firstCoeff.average ? parseFloat(firstCoeff.average) : 0;
+    const stdDev = firstCoeff.stdDeviation ? parseFloat(firstCoeff.stdDeviation) : 1;
+
+    // Standart puan: 50 + 10 × (Ham - Ortalama) / StdDev
+    const standardPuan = 50 + 10 * ((hamPuan - average) / stdDev);
+
+    return {
+      year,
+      hamPuan: Math.round(hamPuan * 100) / 100,
+      standardPuan: Math.round(standardPuan * 100) / 100,
+      average,
+      stdDeviation: stdDev,
+    };
+  };
+
+  // Hesapla butonu
+  const handleCalculate = async () => {
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setComparison([]);
+
+    try {
+      // Son 3 yılın katsayılarını çek
+      const years = [currentYear, currentYear - 1, currentYear - 2];
+      const allCoefficients: any[] = [];
+      let hasAnyData = false;
+
+      for (const year of years) {
+        const response = await fetch(
+          `${API_BASE}/score-coefficients?examType=${examType}&year=${year}`,
+          { headers: { 'Authorization': `Bearer ${localStorage.getItem('optiksinav-token') || ''}` } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (data.coefficients && data.coefficients.length > 0) {
+            allCoefficients.push(...data.coefficients);
+            hasAnyData = true;
+          }
+        }
+      }
+
+      if (!hasAnyData) {
+        setError(`${examType} için ${currentYear - 2}-${currentYear} yılları arasında henüz katsayı verisi girilmemiş.`);
+        return;
+      }
+
+      // Güncel yıl için hesapla
+      const currentResult = await calculateForYear(currentYear, allCoefficients);
+      if (!currentResult) {
+        setError(`${examType} için ${currentYear} yılı katsayı verisi eksik.`);
+        return;
+      }
+
+      setResult(currentResult);
+
+      // Karşılaştırma tablosu (son 3 yıl)
+      const comparisons: any[] = [];
+      for (const year of years) {
+        const r = await calculateForYear(year, allCoefficients);
+        if (r) {
+          comparisons.push(r);
+        }
+      }
+      setComparison(comparisons);
+    } catch (err: any) {
+      setError('Hesaplama sırasında bir hata oluştu: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const examTypeLabels: Record<string, string> = {
+    TYT: '📝 TYT (Temel Yeterlilik Testi)',
+    AYT: '📚 AYT (Alan Yeterlilik Testi)',
+    LGS: '🎓 LGS (Liseye Geçiş Sınavı)',
+  };
+
+  return (
+    <div className={`p-6 max-w-4xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>🧮 Puan Hesaplama</h1>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Dashboard
+          </a>
+          <a href="/score-coefficients" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            📐 Katsayılar
+          </a>
+        </div>
+      </div>
+
+      <p className={`mb-6 text-sm ${textSecondary(theme)}`}>
+        Net sayılarınızı girerek tahmini YKS/LGS puanınızı hesaplayın. Son 3 yılın katsayılarıyla karşılaştırma yapılır.
+      </p>
+
+      {/* Sınav Türü Seçimi */}
+      <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-6`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {['TYT', 'AYT', 'LGS'].map(type => (
+            <button
+              key={type}
+              onClick={() => setExamType(type)}
+              className={`px-4 py-3 rounded-lg font-semibold text-sm transition-colors ${
+                examType === type
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : `${bgCard(theme)} ${textPrimary(theme)} border ${borderColor(theme)} hover:bg-blue-50`
+              }`}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+        <p className={`mt-3 text-xs ${textSecondary(theme)}`}>Seçili: {examTypeLabels[examType]}</p>
+      </div>
+
+      {/* Net Giriş Tablosu */}
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)} mb-6`}>
+        <div className={`p-4 border-b ${borderColor2(theme)}`}>
+          <h3 className={`font-semibold text-sm ${textPrimary(theme)}`}>{examType} — Net Girişi</h3>
+          <p className={`text-xs mt-1 ${textSecondary(theme)}`}>
+            {subjectsLoaded ? '📊 Katsayı tablosundan dersler otomatik yüklendi' : 'ℹ️ Varsayılan ders listesi gösteriliyor (katsayı verisi yok)'}
+          </p>
+        </div>
+
+        <div className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {subjects.map(subjectCode => (
+              <div key={subjectCode}>
+                <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>
+                  {subjectLabels[subjectCode] || subjectCode}
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={nets[subjectCode] || ''}
+                  onChange={(e) => handleNetChange(subjectCode, e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  max="40"
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              onClick={handleCalculate}
+              disabled={loading || subjects.length === 0}
+              className="px-8 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? '🔄 Hesaplanıyor...' : '🧮 Hesapla'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Hata Mesajı */}
+      {error && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
+          ⚠️ {error}
+          <button onClick={() => setError('')} className="ml-2 font-bold">&times;</button>
+        </div>
+      )}
+
+      {/* Sonuç */}
+      {result && (
+        <div className={`rounded-xl shadow-sm border overflow-hidden mb-6 ${bgCard(theme)} ${borderColor(theme)}`}>
+          <div className="bg-green-600 text-white p-4">
+            <h3 className="font-bold text-lg">✅ Tahmini Puan ({currentYear})</h3>
+          </div>
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-green-50'}`}>
+                <p className={`text-xs font-medium ${textMuted(theme)}`}>Ham Puan</p>
+                <p className={`text-2xl font-bold ${textPrimary(theme)}`}>{result.hamPuan}</p>
+              </div>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-blue-50'}`}>
+                <p className={`text-xs font-medium ${textMuted(theme)}`}>Standart Puan</p>
+                <p className={`text-2xl font-bold text-blue-600`}>{result.standardPuan}</p>
+              </div>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-purple-50'}`}>
+                <p className={`text-xs font-medium ${textMuted(theme)}`}>Sınıf Ortalaması</p>
+                <p className={`text-2xl font-bold ${textSecondary(theme)}`}>{result.average}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Karşılaştırma Tablosu */}
+      {comparison.length > 1 && (
+        <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+          <div className={`p-4 border-b ${borderColor2(theme)}`}>
+            <h3 className={`font-semibold text-sm ${textPrimary(theme)}`}>📊 Son 3 Yıl Karşılaştırması</h3>
+            <p className={`text-xs mt-1 ${textSecondary(theme)}`}>Aynı netlerle farklı yılların katsayılarıyla hesaplanan tahmini puanlar</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}>
+                <tr>
+                  <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>Yıl</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Ham Puan</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Standart Puan</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Ortalama</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Std. Sapma</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${borderColor2(theme)}`}>
+                {comparison.map((r, i) => (
+                  <tr
+                    key={r.year}
+                    className={i === 0
+                      ? (theme === 'dark' ? 'bg-green-900/20' : 'bg-green-50')
+                      : (theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50')
+                    }
+                  >
+                    <td className={`px-4 py-3 font-medium ${textPrimary(theme)}`}>
+                      {r.year} {i === 0 && '(Güncel)'}
+                    </td>
+                    <td className={`px-4 py-3 text-center ${textPrimary(theme)}`}>{r.hamPuan}</td>
+                    <td className={`px-4 py-3 text-center font-bold ${i === 0 ? 'text-green-600' : textSecondary(theme)}`}>
+                      {r.standardPuan}
+                    </td>
+                    <td className={`px-4 py-3 text-center ${textSecondary(theme)}`}>{r.average}</td>
+                    <td className={`px-4 py-3 text-center ${textSecondary(theme)}`}>{r.stdDeviation}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Formül Bilgisi */}
+      <div className={`mt-6 p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+        <h3 className={`text-sm font-semibold mb-2 ${textMuted(theme)}`}>📐 Kullanılan Formül (Standart ÖSYM Yöntemi)</h3>
+        <div className={`text-xs font-mono p-3 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+          <p>Ham Puan = Σ (ders_net × ders_katsayısı)</p>
+          <p>Standart Puan = 50 + 10 × (Ham Puan − Ortalama) / Standart Sapma</p>
+        </div>
+        <p className={`text-xs mt-2 ${textSecondary(theme)}`}>
+          Bu hesaplama tahminidir ve gerçekteki ÖSYM puanlama sisteminden farklılık gösterebilir.
+          Otomatik sınav okuma tamamlandığında sistem her zaman en güncel yılın katsayılarını kullanacaktır.
         </p>
       </div>
     </div>
