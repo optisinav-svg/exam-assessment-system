@@ -118,6 +118,7 @@ function AppRoutes() {
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/messages" element={<AdminMessagesPage />} />
         <Route path="/schools" element={<SchoolsPage />} />
+        <Route path="/score-coefficients" element={<ScoreCoefficientsPage />} />
       </Routes>
     </div>
   );
@@ -2255,6 +2256,290 @@ function SchoolsPage() {
         <p className={`text-sm ${textSecondary(theme)}`}>
           Okul ve sınıflarınızı burada yönetebilirsiniz. Eklediğiniz okullar, sınav tanımlama ve öğrenci kayıt işlemlerinde kullanılacaktır.
           Her okul altında birden fazla sınıf oluşturabilirsiniz.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Puan Katsayıları Yönetim Sayfası ─────────────────────────────────────
+// Yıllık TYT/AYT/LGS puan hesaplama katsayıları
+function ScoreCoefficientsPage() {
+  const { theme } = useTheme();
+  const [examType, setExamType] = useState('TYT');
+  const [year, setYear] = useState('2026');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [rows, setRows] = useState<any[]>([]);
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+  const authHeaders = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Varsayılan dersler (her sınav türü için)
+  const defaultSubjects: Record<string, string[]> = {
+    TYT: ['turkce', 'matematik', 'sosyal', 'fen'],
+    AYT: ['matematik', 'fizik', 'kimya', 'biyoloji', 'tarih1', 'tarih2', 'cografya1', 'cografya2', 'felsefe', 'din'],
+    LGS: ['turkce', 'matematik', 'fen', 'sosyal', 'ingilizce', 'din'],
+  };
+
+  // Verileri yükle
+  const fetchCoefficients = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `${API_BASE}/score-coefficients?examType=${examType}&year=${year}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.coefficients && data.coefficients.length > 0) {
+          // Mevcut kayıtları kullan
+          setRows(data.coefficients.map((c: any) => ({
+            subjectCode: c.subjectCode,
+            average: c.average || '',
+            stdDeviation: c.stdDeviation || '',
+            coefficient: c.coefficient || '',
+            id: c.id,
+          })));
+        } else {
+          // Varsayılan derslerle boş satırlar oluştur
+          const subjects = defaultSubjects[examType] || defaultSubjects.TYT;
+          setRows(subjects.map(s => ({
+            subjectCode: s,
+            average: '',
+            stdDeviation: '',
+            coefficient: '',
+            id: null,
+          })));
+        }
+      } else {
+        // API yoksa varsayılan dersleri göster
+        const subjects = defaultSubjects[examType] || defaultSubjects.TYT;
+        setRows(subjects.map(s => ({
+          subjectCode: s,
+          average: '',
+          stdDeviation: '',
+          coefficient: '',
+          id: null,
+        })));
+      }
+    } catch (err: any) {
+      // API yoksa varsayılan dersleri göster
+      const subjects = defaultSubjects[examType] || defaultSubjects.TYT;
+      setRows(subjects.map(s => ({
+        subjectCode: s,
+        average: '',
+        stdDeviation: '',
+        coefficient: '',
+        id: null,
+      })));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCoefficients();
+  }, [examType, year]);
+
+  // Satır güncelleme
+  const updateRow = (index: number, field: string, value: string) => {
+    setRows(prev => prev.map((row, i) =>
+      i === index ? { ...row, [field]: value } : row
+    ));
+  };
+
+  // Kaydet (bulk)
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess(false);
+    try {
+      const items = rows.map(r => ({
+        subjectCode: r.subjectCode,
+        average: r.average ? parseFloat(r.average) : undefined,
+        stdDeviation: r.stdDeviation ? parseFloat(r.stdDeviation) : undefined,
+        coefficient: r.coefficient ? parseFloat(r.coefficient) : undefined,
+      }));
+
+      const response = await fetch(`${API_BASE}/score-coefficients/bulk`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ examType, year: parseInt(year), items }),
+      });
+
+      if (response.ok) {
+        setSuccess(true);
+        fetchCoefficients(); // Yeniden yükle
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        const data = await response.json();
+        setError(data.message || 'Kaydedilemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const examTypeLabels: Record<string, string> = {
+    TYT: '📝 TYT (Temel Yeterlilik)',
+    AYT: '📚 AYT (Alan Yeterlilik)',
+    LGS: '🎓 LGS (Lise Geçiş)',
+  };
+
+  return (
+    <div className={`p-6 max-w-6xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>📐 Puan Katsayıları</h1>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Dashboard
+          </a>
+        </div>
+      </div>
+
+      <p className={`mb-6 text-sm ${textSecondary(theme)}`}>
+        TYT/AYT/LGS puan hesaplaması için kullanılan yıllık katsayıları (ham puan ortalaması, standart sapma, ağırlık katsayısı) yönetin.
+      </p>
+
+      {/* Filtre: Sınav Türü + Yıl */}
+      <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-6`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Sınav Türü</label>
+            <select
+              value={examType}
+              onChange={(e) => setExamType(e.target.value)}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+            >
+              <option value="TYT">TYT</option>
+              <option value="AYT">AYT</option>
+              <option value="LGS">LGS</option>
+            </select>
+          </div>
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${textMuted(theme)}`}>Yıl</label>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              min="2020"
+              max="2030"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={fetchCoefficients}
+              className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}
+            >
+              🔄 Yenile
+            </button>
+          </div>
+        </div>
+        <p className={`mt-2 text-xs ${textSecondary(theme)}`}>
+          Seçili: {examTypeLabels[examType]} — {year}
+        </p>
+      </div>
+
+      {/* Hata Mesajı */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          ⚠️ {error}
+          <button onClick={() => setError('')} className="ml-2 font-bold">&times;</button>
+        </div>
+      )}
+
+      {/* Başarı Mesajı */}
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          ✅ Katsayılar başarıyla kaydedildi!
+        </div>
+      )}
+
+      {/* Katsayı Tablosu */}
+      {loading ? (
+        <div className={`p-12 text-center ${bgCard(theme)} rounded-xl`}>Yükleniyor...</div>
+      ) : (
+        <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}>
+                <tr>
+                  <th className={`px-4 py-3 text-left ${textPrimary(theme)}`}>Ders Kodu</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Ham Puan Ortalaması</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Standart Sapma</th>
+                  <th className={`px-4 py-3 text-center ${textPrimary(theme)}`}>Ağırlık Katsayısı</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${borderColor2(theme)}`}>
+                {rows.map((row, index) => (
+                  <tr key={row.subjectCode} className={theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                    <td className={`px-4 py-3 font-medium ${textPrimary(theme)}`}>{row.subjectCode}</td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.average}
+                        onChange={(e) => updateRow(index, 'average', e.target.value)}
+                        placeholder="0.00"
+                        className={`w-24 px-2 py-1 border rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.stdDeviation}
+                        onChange={(e) => updateRow(index, 'stdDeviation', e.target.value)}
+                        placeholder="0.00"
+                        className={`w-24 px-2 py-1 border rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={row.coefficient}
+                        onChange={(e) => updateRow(index, 'coefficient', e.target.value)}
+                        placeholder="0.0000"
+                        className={`w-24 px-2 py-1 border rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Kaydet Butonu */}
+          <div className={`p-4 border-t ${borderColor2(theme)} flex justify-end`}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? '🔄 Kaydediliyor...' : '💾 Kaydet'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bilgi Kartı */}
+      <div className={`mt-6 p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+        <h3 className={`text-sm font-semibold mb-2 ${textMuted(theme)}`}>💡 Bilgi</h3>
+        <p className={`text-sm ${textSecondary(theme)}`}>
+          Bu katsayılar, öğrencilerin TYT/AYT/LGS puanlarının hesaplanmasında kullanılır.
+          Her yıl ÖSYM tarafından yayınlanan yeni katsayıları buraya girebilirsiniz.
+          Aynı sınav türü ve yıl kombinasyonu için yeni kayıt eklemek yerine mevcut kayıtlar güncellenir.
         </p>
       </div>
     </div>

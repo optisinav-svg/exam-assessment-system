@@ -1,4 +1,16 @@
-import { pgTable, serial, varchar, text, timestamp, integer, jsonb, boolean, primaryKey, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, text, timestamp, integer, jsonb, boolean, primaryKey, doublePrecision, numeric } from 'drizzle-orm/pg-core';
+
+// Puan Hesaplama Katsayıları (Yıllık)
+export const scoreCoefficients = pgTable('score_coefficients', {
+  id: serial('id').primaryKey(),
+  examType: varchar('exam_type', { length: 20 }).notNull(), // 'TYT' | 'AYT' | 'LGS'
+  year: integer('year').notNull(),
+  subjectCode: varchar('subject_code', { length: 50 }).notNull(), // örn. 'turkce','matematik'
+  average: numeric('average'),        // ham puan ortalaması
+  stdDeviation: numeric('std_deviation'), // standart sapma
+  coefficient: numeric('coefficient'),    // ağırlık katsayısı
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 // Kullanıcılar (Öğretmenler)
 export const users = pgTable('users', {
