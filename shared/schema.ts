@@ -1,4 +1,16 @@
-import { pgTable, serial, varchar, text, timestamp, integer, jsonb, boolean, primaryKey, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, text, timestamp, integer, jsonb, boolean, primaryKey, doublePrecision, numeric } from 'drizzle-orm/pg-core';
+
+// Puan Hesaplama Katsayıları (Yıllık)
+export const scoreCoefficients = pgTable('score_coefficients', {
+  id: serial('id').primaryKey(),
+  examType: varchar('exam_type', { length: 20 }).notNull(), // 'TYT' | 'AYT' | 'LGS'
+  year: integer('year').notNull(),
+  subjectCode: varchar('subject_code', { length: 50 }).notNull(), // örn. 'turkce','matematik'
+  average: numeric('average'),        // ham puan ortalaması
+  stdDeviation: numeric('std_deviation'), // standart sapma
+  coefficient: numeric('coefficient'),    // ağırlık katsayısı
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 // Kullanıcılar (Öğretmenler)
 export const users = pgTable('users', {
@@ -115,6 +127,11 @@ export const exams = pgTable('exams', {
   optionCount: integer('option_count').default(4), // 3, 4 veya 5 seçenekli
   negativeMarking: boolean('negative_marking').default(true), // yanlış doğruyu eksiltsin mi
   status: varchar('status', { length: 50 }).default('draft'),
+  examType: varchar('exam_type', { length: 20 }), // 'TYT' | 'AYT' | 'LGS' | 'custom'
+  // AYT sınavı, hangi TYT sınavının netleriyle birlikte puanlanacaksa onu gösterir.
+  // (TYT ve AYT ayrı günlerde uygulanır; puan hesaplaması ikisinin netlerini birlikte kullanır.
+  //  LGS için buna gerek yok: LGS zaten tek sınav içinde iki oturum/ders grubu olarak tanımlanıyor.)
+  relatedExamId: integer('related_exam_id'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

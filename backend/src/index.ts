@@ -14,6 +14,7 @@ import whatsappRouter from './routes/whatsapp.routes';
 import analyticsRouter from './routes/analytics.routes';
 import schoolRouter from './routes/school.routes';
 import rosterRoutes from './routes/roster.routes';
+import scoreCoefficientsRouter from './routes/score-coefficients.routes';
 import studentAuthRoutes from './routes/student-auth.routes';
 import studentRoutes from './routes/student.routes';
 import subjectRoutes from './routes/subject.routes';
@@ -54,6 +55,7 @@ app.use('/api/whatsapp', verifyToken, whatsappRouter); // WhatsApp mesajlaşma -
 app.use('/api/analytics', verifyToken, analyticsRouter); // Analitik - giriş gerektirir
 app.use('/api/schools', verifyToken, schoolRouter); // Okul/Sınıf yönetimi - giriş gerektirir
 app.use('/api/roster', verifyToken, rosterRoutes); // Öğrenci manuel ekleme - giriş gerektirir
+app.use('/api/score-coefficients', verifyToken, scoreCoefficientsRouter); // Puan katsayıları - giriş gerektirir
 app.use('/api/student-auth', studentAuthRoutes); // Öğrenci kayıt/giriş/e-posta onayı - herkese açık
 app.use('/api/students', verifyToken, studentRoutes); // Öğrenci onay/listeleme - öğretmen girişi gerektirir
 app.use('/api/subjects', verifyToken, subjectRoutes); // Dersler - giriş gerektirir
