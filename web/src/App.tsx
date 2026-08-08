@@ -121,6 +121,7 @@ function AppRoutes() {
         <Route path="/score-coefficients" element={<ScoreCoefficientsPage />} />
         <Route path="/score-calculator" element={<ScoreCalculatorPage />} />
         <Route path="/outcomes" element={<OutcomesPage />} />
+        <Route path="/overview" element={<OverviewPage />} />
       </Routes>
     </div>
   );
@@ -263,9 +264,27 @@ function DashboardPage() {
     <div className={`p-6 max-w-7xl mx-auto transition-colors duration-300`}>
       <div className="flex items-center justify-between mb-6">
         <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>📊 Dashboard</h1>
-        <nav className="flex gap-3">
-          <a href="/import" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
-            Excel Import
+        <nav className="flex gap-2 flex-wrap">
+          <a href="/overview" className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+            🏠 Genel Bakış
+          </a>
+          <a href="/import" className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+            📥 Excel Import
+          </a>
+          <a href="/schools" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
+            🏫 Okullar
+          </a>
+          <a href="/outcomes" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
+            📚 Kazanımlar
+          </a>
+          <a href="/score-calculator" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
+            🧮 Puan Hesapla
+          </a>
+          <a href="/score-coefficients" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
+            📐 Katsayılar
+          </a>
+          <a href="/admin" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
+            ⚙️ Admin
           </a>
         </nav>
       </div>
@@ -3581,6 +3600,208 @@ function OutcomesPage() {
           Sayfalama sayesinde binlerce kazanım sorunsuz görüntülenebilir.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── Genel Bakış / Özet Ekranı ─────────────────────────────────────────────
+function OverviewPage() {
+  const { theme } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [summary, setSummary] = useState<any>({
+    totalStudents: 0,
+    totalExams: 0,
+    totalSchools: 0,
+    totalClasses: 0,
+    totalSubjects: 0,
+    recentExams: [],
+  });
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+
+  useEffect(() => {
+    fetchOverviewData();
+  }, []);
+
+  const fetchOverviewData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      // Okulları çek
+      const schoolsRes = await fetch(`${API_BASE}/schools`, { headers });
+      let schools: any[] = [];
+      if (schoolsRes.ok) {
+        const data = await schoolsRes.json();
+        schools = data.schools || [];
+      }
+
+      // Sınıf sayılarını topla
+      let totalClasses = 0;
+      let totalStudents = 0;
+      for (const school of schools) {
+        try {
+          const classesRes = await fetch(`${API_BASE}/schools/${school.id}/classes`, { headers });
+          if (classesRes.ok) {
+            const classData = await classesRes.json();
+            const classes = classData.classes || [];
+            totalClasses += classes.length;
+          }
+        } catch (e) { /* sınırlı hata */ }
+      }
+
+      // Öğrenci sayısı için roster endpoint kullan
+      try {
+        const rosterRes = await fetch(`${API_BASE}/roster/classes/0/students`, { headers });
+        if (rosterRes.ok) {
+          const data = await rosterRes.json();
+          totalStudents = data.totalStudents || 0;
+        }
+      } catch (e) { /* fallback */ }
+
+      // Sınavları çek
+      const examsRes = await fetch(`${API_BASE}/exams`, { headers });
+      let recentExams: any[] = [];
+      if (examsRes.ok) {
+        const data = await examsRes.json();
+        recentExams = (data.exams || []).slice(0, 5);
+      }
+
+      // Dersleri çek
+      let totalSubjects = 0;
+      try {
+        const subjectsRes = await fetch(`${API_BASE}/subjects`, { headers });
+        if (subjectsRes.ok) {
+          const data = await subjectsRes.json();
+          totalSubjects = (data.subjects || data.userSubjects || []).length;
+        }
+      } catch (e) { /* fallback */ }
+
+      setSummary({
+        totalStudents,
+        totalExams: recentExams.length,
+        totalSchools: schools.length,
+        totalClasses,
+        totalSubjects,
+        recentExams,
+      });
+    } catch (err: any) {
+      setError('Veriler yüklenemedi: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cards = [
+    { label: 'Toplam Öğrenci', value: summary.totalStudents, icon: '👨‍🎓', color: 'text-purple-600', link: '/schools' },
+    { label: 'Toplam Sınav', value: summary.totalExams, icon: '📝', color: 'text-blue-600', link: '/dashboard' },
+    { label: 'Okul / Sınıf', value: `${summary.totalSchools} / ${summary.totalClasses}`, icon: '🏫', color: 'text-green-600', link: '/schools' },
+    { label: 'Toplam Ders', value: summary.totalSubjects, icon: '📚', color: 'text-orange-600', link: '/outcomes' },
+  ];
+
+  return (
+    <div className={`p-6 max-w-6xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>🏠 Genel Bakış</h1>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Dashboard
+          </a>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          ⚠️ {error}
+          <button onClick={() => setError('')} className="ml-2 font-bold">&times;</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className={`p-12 text-center ${bgCard(theme)} rounded-xl`}>Yükleniyor...</div>
+      ) : (
+        <>
+          {/* Özet Kartları */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {cards.map((card, i) => (
+              <a
+                key={i}
+                href={card.link}
+                className={`p-5 rounded-xl shadow-sm border transition-all hover:shadow-md hover:scale-[1.02] cursor-pointer ${bgCard(theme)} ${borderColor(theme)}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{card.icon}</span>
+                  <div>
+                    <h3 className={`text-sm ${textSecondary(theme)}`}>{card.label}</h3>
+                    <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+
+          {/* Son Eklenen Sınavlar */}
+          <div className={`rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-8`}>
+            <div className={`p-4 border-b ${borderColor2(theme)}`}>
+              <h3 className={`font-semibold ${textPrimary(theme)}`}>📋 Son Eklenen Sınavlar</h3>
+            </div>
+            {summary.recentExams.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className={textSecondary(theme)}>Henüz sınav eklenmemiş</p>
+                <p className={`text-xs mt-1 ${textMuted(theme)}`}>Excel Import sayfasından sınav verisi yükleyebilirsiniz</p>
+              </div>
+            ) : (
+              <div className={`divide-y ${borderColor2(theme)}`}>
+                {summary.recentExams.map((exam: any) => (
+                  <a
+                    key={exam.id}
+                    href={`/exam/${exam.id}`}
+                    className={`flex items-center justify-between px-4 py-3 transition-colors ${
+                      theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">📝</span>
+                      <div>
+                        <p className={`font-medium text-sm ${textPrimary(theme)}`}>{exam.name || `Sınav ${exam.id}`}</p>
+                        <p className={`text-xs ${textMuted(theme)}`}>
+                          {exam.date ? new Date(exam.date).toLocaleDateString('tr-TR') : new Date(exam.createdAt).toLocaleDateString('tr-TR')}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-blue-100 text-blue-700'}`}>
+                      →
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Hızlı Erişim */}
+          <div className={`rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+            <div className={`p-4 border-b ${borderColor2(theme)}`}>
+              <h3 className={`font-semibold ${textPrimary(theme)}`}>⚡ Hızlı Erişim</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
+              <a href="/import" className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} ${textPrimary(theme)}`}>
+                📥 Excel Import
+              </a>
+              <a href="/schools" className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} ${textPrimary(theme)}`}>
+                🏫 Okullar & Sınıflar
+              </a>
+              <a href="/outcomes" className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} ${textPrimary(theme)}`}>
+                📚 Kazanımlar
+              </a>
+              <a href="/score-calculator" className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} ${textPrimary(theme)}`}>
+                🧮 Puan Hesapla
+              </a>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
