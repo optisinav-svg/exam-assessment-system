@@ -33,7 +33,7 @@ router.get('/me', async (req: Request, res: Response) => {
 router.put('/me/profile', async (req: Request, res: Response) => {
   try {
     const studentId = (req as any).user?.id;
-    const { fullName, profileImage } = req.body;
+    const { fullName, profileImage, diplomaScore } = req.body;
 
     const updates: Record<string, any> = {};
     if (fullName !== undefined) {
@@ -42,6 +42,7 @@ router.put('/me/profile', async (req: Request, res: Response) => {
       updates.lastName = parts.slice(1).join(' ') || '-';
     }
     if (profileImage !== undefined) updates.profileImage = profileImage;
+    if (diplomaScore !== undefined) updates.diplomaScore = diplomaScore;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ message: 'Güncellenecek bir alan gönderilmedi.' });

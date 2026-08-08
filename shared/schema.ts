@@ -62,6 +62,7 @@ export const students = pgTable('students', {
   isEmailVerified: boolean('is_email_verified').default(false), // e-posta onayı
   emailVerificationToken: varchar('email_verification_token', { length: 255 }),
   profileImage: text('profile_image'),
+  diplomaScore: doublePrecision('diploma_score'), // TYT/AYT puan hesaplamasında kullanılır
 });
 
 // Öğrenci Kayıt Geçmişi — bir öğrenci birden fazla öğretmen/sınıfa bağlı
