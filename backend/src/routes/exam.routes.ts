@@ -111,11 +111,23 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// Sınav ayarlarını güncelle (ör. "yanlış doğruyu eksiltsin mi" butonu)
+// Sınav ayarlarını güncelle (tam düzenleme: başlık, cevap anahtarı, sorular, sınıflar, vb.)
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id);
-    const { optionCount, negativeMarking, title, correctAnswers, totalQuestions } = req.body;
+    const {
+      optionCount,
+      negativeMarking,
+      title,
+      correctAnswers,
+      totalQuestions,
+      examDate,
+      examType,
+      relatedExamId,
+      totalScore,
+      classIds,
+      questions,
+    } = req.body;
 
     const [updated] = await db.update(exams)
       .set({
@@ -124,12 +136,44 @@ router.put('/:id', async (req: Request, res: Response) => {
         ...(title !== undefined && { title }),
         ...(correctAnswers !== undefined && { correctAnswers }),
         ...(totalQuestions !== undefined && { totalQuestions }),
+        ...(examDate !== undefined && { examDate: new Date(examDate) }),
+        ...(examType !== undefined && { examType }),
+        ...(relatedExamId !== undefined && { relatedExamId }),
+        ...(totalScore !== undefined && { totalScore }),
       })
       .where(eq(exams.id, id))
       .returning();
 
+    // Sınıf ataması güncelleniyorsa: eskisini sil, yenisini ekle
+    if (classIds !== undefined) {
+      await db.delete(examClasses).where(eq(examClasses.examId, id));
+      if (classIds.length > 0) {
+        await db.insert(examClasses).values(
+          classIds.map((classId: number) => ({ examId: id, classId }))
+        );
+      }
+    }
+
+    // Soru bazlı ders/kazanım eşlemesi güncelleniyorsa: eskisini sil, yenisini ekle
+    if (questions !== undefined) {
+      await db.delete(examQuestions).where(eq(examQuestions.examId, id));
+      if (questions.length > 0) {
+        await db.insert(examQuestions).values(
+          questions.map((q: any) => ({
+            examId: id,
+            questionNumber: q.questionNumber,
+            subjectId: q.subjectId ?? null,
+            learningOutcomeId: q.learningOutcomeId ?? null,
+            customOutcomeText: q.customOutcomeText ?? null,
+            correctAnswer: q.correctAnswer,
+          }))
+        );
+      }
+    }
+
     res.json(updated);
   } catch (error) {
+    console.error('Exam update error:', error);
     res.status(500).json({ message: 'Sınav güncellenirken hata oluştu', error });
   }
 });

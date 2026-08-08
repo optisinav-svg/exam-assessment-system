@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
   FlatList,
 } from 'react-native';
-import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import StudentRegisterScreen from './screens/StudentRegisterScreen';
@@ -27,6 +28,7 @@ const AuthStack = createStackNavigator();
 // Ana Ekran
 function HomeScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+  const { colors } = useTheme();
   const isTeacher = user?.role === 'teacher';
 
   const handleScan = () => {
@@ -41,8 +43,8 @@ function HomeScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Çıkış</Text>
         </TouchableOpacity>
@@ -54,35 +56,47 @@ function HomeScreen({ navigation }: any) {
 
       {isTeacher ? (
         <View style={styles.menu}>
-          <TouchableOpacity style={styles.menuItem} onPress={handleScan}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={handleScan}>
             <Text style={styles.menuIcon}>📸</Text>
-            <Text style={styles.menuText}>Optik Oku</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Optik Oku</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Results')}>
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => navigation.navigate('Results')}
+          >
             <Text style={styles.menuIcon}>📊</Text>
-            <Text style={styles.menuText}>Sonuçlar</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Sonuçlar</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Exams')}>
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => navigation.navigate('Exams')}
+          >
             <Text style={styles.menuIcon}>📝</Text>
-            <Text style={styles.menuText}>Sınavlar</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Sınavlar</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('PendingStudents')}>
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => navigation.navigate('PendingStudents')}
+          >
             <Text style={styles.menuIcon}>🎓</Text>
-            <Text style={styles.menuText}>Bekleyen{'\n'}Öğrenciler</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Bekleyen{'\n'}Öğrenciler</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Profile')}>
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => navigation.navigate('Profile')}
+          >
             <Text style={styles.menuIcon}>👤</Text>
-            <Text style={styles.menuText}>Profil</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Profil</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.centerMessage}>
           <Text style={styles.centerMessageIcon}>🎓</Text>
-          <Text style={styles.centerMessageText}>
+          <Text style={[styles.centerMessageText, { color: colors.textSecondary }]}>
             Öğrenci paneli yakında burada olacak.{'\n'}
             Sonuçlarını ve kazanımlarını yakında buradan görebileceksin.
           </Text>
@@ -100,12 +114,13 @@ function HomeScreen({ navigation }: any) {
 
 // Optik Okuma Ekranı (v1: gerçek okuma özelliği geliştirme aşamasında)
 function ScanScreen() {
+  const { colors } = useTheme();
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.scanContainer}>
         <View style={styles.centerMessage}>
           <Text style={styles.centerMessageIcon}>🚧</Text>
-          <Text style={styles.centerMessageText}>
+          <Text style={[styles.centerMessageText, { color: colors.textSecondary }]}>
             Optik okuma özelliği geliştirme aşamasındadır.{'\n'}
             Yakında burada olacak.
           </Text>
@@ -117,13 +132,14 @@ function ScanScreen() {
 
 // Örnek Sonuçlar Ekranı
 function ResultsScreen() {
+  const { colors } = useTheme();
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <Text style={styles.title}>Sonuçlar</Text>
       </View>
       <View style={styles.resultsList}>
-        <Text style={styles.subtitle}>Henüz sonuç yok</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Henüz sonuç yok</Text>
       </View>
     </SafeAreaView>
   );
@@ -131,6 +147,7 @@ function ResultsScreen() {
 
 // Sınavlar Ekranı
 function ExamsScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const [exams, setExams] = useState<Exam[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -153,8 +170,8 @@ function ExamsScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <Text style={styles.title}>Sınavlar</Text>
         <TouchableOpacity
           style={styles.newExamButton}
@@ -166,11 +183,11 @@ function ExamsScreen({ navigation }: any) {
 
       {isLoading ? (
         <View style={styles.resultsList}>
-          <ActivityIndicator size="large" color="#4A6CF7" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : exams.length === 0 ? (
         <View style={styles.resultsList}>
-          <Text style={styles.subtitle}>Henüz sınav yok</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Henüz sınav yok</Text>
         </View>
       ) : (
         <FlatList
@@ -178,12 +195,16 @@ function ExamsScreen({ navigation }: any) {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.examList}
           renderItem={({ item }) => (
-            <View style={styles.examCard}>
-              <Text style={styles.examCardTitle}>{item.title}</Text>
-              <Text style={styles.examCardDetail}>
+            <TouchableOpacity
+              style={[styles.examCard, { backgroundColor: colors.card }]}
+              onPress={() => navigation.navigate('CreateExam', { examId: item.id })}
+            >
+              <Text style={[styles.examCardTitle, { color: colors.text }]}>{item.title}</Text>
+              <Text style={[styles.examCardDetail, { color: colors.textSecondary }]}>
                 {item.examDate?.slice(0, 10)} · {item.totalQuestions} soru · {item.optionCount} seçenekli
+                {(item as any).examType ? ` · ${(item as any).examType}` : ''}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}
@@ -220,17 +241,18 @@ function MainNavigator() {
 // Oturum durumuna göre doğru ekran grubunu seçer
 function RootNavigator() {
   const { user, isLoading } = useAuth();
+  const { colors, mode } = useTheme();
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#4A6CF7" />
+      <SafeAreaView style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={mode === 'dark' ? NavigationDarkTheme : NavigationDefaultTheme}>
       {user ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
@@ -240,9 +262,11 @@ function RootNavigator() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

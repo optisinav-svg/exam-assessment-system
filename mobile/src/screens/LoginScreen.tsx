@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   UserRole,
   getRememberedCredentials,
@@ -20,6 +21,7 @@ import {
 } from '../services/api';
 
 export default function LoginScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const { login, isSubmitting } = useAuth();
   const [role, setRole] = useState<UserRole>('teacher');
   const [email, setEmail] = useState('');
@@ -67,7 +69,7 @@ export default function LoginScreen({ navigation }: any) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <Text style={styles.logo}>📝</Text>
           <Text style={styles.title}>OptikSınav</Text>
@@ -98,7 +100,7 @@ export default function LoginScreen({ navigation }: any) {
         <View style={styles.form}>
           <Text style={styles.label}>E-posta</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
             placeholder="ornek@okul.com"
             value={email}
             onChangeText={setEmail}
@@ -109,7 +111,7 @@ export default function LoginScreen({ navigation }: any) {
 
           <Text style={styles.label}>Şifre</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
             placeholder="••••••••"
             value={password}
             onChangeText={setPassword}

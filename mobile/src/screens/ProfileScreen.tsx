@@ -13,10 +13,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { getMyProfile, updateMyProfile, updateMyPassword } from '../services/api';
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+  const { colors, preference, setPreference } = useTheme();
   const role = (user?.role === 'student' ? 'student' : 'teacher') as 'teacher' | 'student';
 
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +108,7 @@ export default function ProfileScreen({ navigation }: any) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>‹ Geri</Text>
@@ -121,24 +123,49 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Kişisel Bilgiler</Text>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Görünüm</Text>
+            <View style={styles.themeRow}>
+              {(
+                [
+                  { key: 'light', label: '☀️ Açık' },
+                  { key: 'dark', label: '🌙 Koyu' },
+                  { key: 'system', label: '📱 Sistem' },
+                ] as const
+              ).map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.themeButton, preference === opt.key && styles.themeButtonActive]}
+                  onPress={() => setPreference(opt.key)}
+                >
+                  <Text
+                    style={[styles.themeButtonText, preference === opt.key && styles.themeButtonTextActive]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
-            <Text style={styles.label}>Ad Soyad</Text>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Kişisel Bilgiler</Text>
+
+            <Text style={[styles.label, { color: colors.text }]}>Ad Soyad</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               value={fullName}
               onChangeText={setFullName}
               placeholder="Ad Soyad"
             />
 
-            <Text style={styles.label}>E-posta</Text>
+            <Text style={[styles.label, { color: colors.text }]}>E-posta</Text>
             <TextInput
-              style={[styles.input, styles.inputDisabled]}
+              style={[styles.input, styles.inputDisabled, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}
               value={email}
               editable={false}
             />
-            <Text style={styles.helperText}>E-posta adresi değiştirilemez.</Text>
+            <Text style={[styles.helperText, { color: colors.textSecondary }]}>E-posta adresi değiştirilemez.</Text>
 
             <TouchableOpacity
               style={[styles.button, savingName && styles.buttonDisabled]}
@@ -153,30 +180,30 @@ export default function ProfileScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Şifre Değiştir</Text>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Şifre Değiştir</Text>
 
-            <Text style={styles.label}>Mevcut Şifre</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Mevcut Şifre</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               value={currentPassword}
               onChangeText={setCurrentPassword}
               secureTextEntry
               placeholder="••••••••"
             />
 
-            <Text style={styles.label}>Yeni Şifre</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Yeni Şifre</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry
               placeholder="••••••••"
             />
 
-            <Text style={styles.label}>Yeni Şifre (Tekrar)</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Yeni Şifre (Tekrar)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               value={newPasswordAgain}
               onChangeText={setNewPasswordAgain}
               secureTextEntry
@@ -276,6 +303,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#222',
     marginBottom: 8,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  themeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+  },
+  themeButtonActive: {
+    backgroundColor: '#4A6CF7',
+  },
+  themeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#555',
+  },
+  themeButtonTextActive: {
+    color: '#fff',
   },
   label: {
     fontSize: 14,

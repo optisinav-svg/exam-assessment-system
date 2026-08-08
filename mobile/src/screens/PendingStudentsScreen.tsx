@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getPendingStudents, approveStudent, rejectStudent, PendingStudent } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function PendingStudentsScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const [students, setStudents] = useState<PendingStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -77,7 +79,7 @@ export default function PendingStudentsScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>‹ Geri</Text>
@@ -114,7 +116,7 @@ export default function PendingStudentsScreen({ navigation }: any) {
             />
           }
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardInfo}>
                 <Text style={styles.cardName}>
                   {item.firstName} {item.lastName}

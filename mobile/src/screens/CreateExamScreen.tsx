@@ -15,7 +15,9 @@ import {
   getSubjects,
   createSubject,
   createExam,
+  updateExam,
   getExams,
+  getExamById,
   getSchools,
   getClassesBySchool,
   searchLearningOutcomes,
@@ -91,7 +93,11 @@ interface QuestionOutcome {
   customText?: string;
 }
 
-export default function CreateExamScreen({ navigation }: any) {
+export default function CreateExamScreen({ navigation, route }: any) {
+  const editingExamId: number | undefined = route?.params?.examId;
+  const [isEditMode] = useState(!!editingExamId);
+  const [isLoadingExam, setIsLoadingExam] = useState(!!editingExamId);
+
   const [title, setTitle] = useState('');
   const [examDate, setExamDate] = useState(todayIso());
   const [totalScore, setTotalScore] = useState('100');
@@ -154,6 +160,64 @@ export default function CreateExamScreen({ navigation }: any) {
       }
     })();
   }, []);
+
+  // Düzenleme modu: mevcut sınavı çek, formu doldur (dersler yüklendikten sonra)
+  useEffect(() => {
+    if (!editingExamId || isLoadingSubjects) return;
+    (async () => {
+      try {
+        const exam = await getExamById(editingExamId);
+        setTitle(exam.title);
+        setExamDate(exam.examDate?.slice(0, 10) || todayIso());
+        setTotalScore(String(exam.totalScore ?? 100));
+        setOptionCount((exam.optionCount as 3 | 4 | 5) || 4);
+        setNegativeMarking(exam.negativeMarking);
+        setSelectedClassIds(exam.classIds || []);
+
+        const mode = (exam.examType as ExamMode) || 'custom';
+        setExamMode(mode);
+        if (exam.relatedExamId) setRelatedTytExamId(exam.relatedExamId);
+        if (mode === 'AYT') loadTytExams();
+
+        // Soruları ders bloklarına grupla (ardışık aynı subjectId = 1 blok)
+        const sortedQuestions = [...(exam.questions || [])].sort(
+          (a, b) => a.questionNumber - b.questionNumber
+        );
+        const blocks: SubjectBlock[] = [];
+        const newAnswers: Record<string, string> = {};
+        const newOutcomes: Record<string, QuestionOutcome> = {};
+
+        for (const q of sortedQuestions) {
+          newAnswers[String(q.questionNumber)] = q.correctAnswer;
+          if (q.learningOutcomeId) {
+            newOutcomes[String(q.questionNumber)] = {
+              learningOutcomeId: q.learningOutcomeId,
+              learningOutcomeLabel: `Kazanım #${q.learningOutcomeId} (seçili)`,
+            };
+          } else if (q.customOutcomeText) {
+            newOutcomes[String(q.questionNumber)] = { customText: q.customOutcomeText };
+          }
+
+          const lastBlock = blocks[blocks.length - 1];
+          if (lastBlock && lastBlock.subjectId === (q.subjectId ?? null)) {
+            lastBlock.count += 1;
+          } else {
+            const subjectName =
+              allSubjects.find((s) => s.id === q.subjectId)?.name || 'Ders';
+            blocks.push({ name: subjectName, count: 1, subjectId: q.subjectId ?? null });
+          }
+        }
+
+        setSubjectBlocks(blocks);
+        setCorrectAnswers(newAnswers);
+        setQuestionOutcomes(newOutcomes);
+      } catch (error) {
+        Alert.alert('Hata', 'Sınav bilgileri yüklenemedi.');
+      } finally {
+        setIsLoadingExam(false);
+      }
+    })();
+  }, [editingExamId, isLoadingSubjects]);
 
   const applyExamMode = (mode: ExamMode) => {
     setExamMode(mode);
@@ -350,7 +414,7 @@ export default function CreateExamScreen({ navigation }: any) {
         };
       });
 
-      await createExam({
+      const payload = {
         title: title.trim(),
         subjectId: resolvedBlocks.length === 1 ? resolvedBlocks[0].subjectId! : undefined,
         examDate,
@@ -363,9 +427,15 @@ export default function CreateExamScreen({ navigation }: any) {
         totalScore: Math.max(1, parseInt(totalScore, 10) || 100),
         classIds: selectedClassIds,
         questions,
-      });
+      };
 
-      Alert.alert('Başarılı', 'Sınav oluşturuldu.', [
+      if (isEditMode && editingExamId) {
+        await updateExam(editingExamId, payload);
+      } else {
+        await createExam(payload);
+      }
+
+      Alert.alert('Başarılı', isEditMode ? 'Sınav güncellendi.' : 'Sınav oluşturuldu.', [
         { text: 'Tamam', onPress: () => navigation.goBack() },
       ]);
     } catch (error: any) {
@@ -377,13 +447,21 @@ export default function CreateExamScreen({ navigation }: any) {
     }
   };
 
+  if (isLoadingExam) {
+    return (
+      <SafeAreaView style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#4A6CF7" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>‹ Geri</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Yeni Sınav Oluştur</Text>
+        <Text style={styles.title}>{isEditMode ? 'Sınavı Düzenle' : 'Yeni Sınav Oluştur'}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -682,7 +760,7 @@ export default function CreateExamScreen({ navigation }: any) {
           {isSubmitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitButtonText}>Sınavı Oluştur</Text>
+            <Text style={styles.submitButtonText}>{isEditMode ? 'Sınavı Güncelle' : 'Sınavı Oluştur'}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

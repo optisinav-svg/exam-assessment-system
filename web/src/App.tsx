@@ -122,6 +122,7 @@ function AppRoutes() {
         <Route path="/score-calculator" element={<ScoreCalculatorPage />} />
         <Route path="/outcomes" element={<OutcomesPage />} />
         <Route path="/overview" element={<OverviewPage />} />
+        <Route path="/storage" element={<StoragePage />} />
       </Routes>
     </div>
   );
@@ -3802,6 +3803,310 @@ function OverviewPage() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Dosya Depolama Ekranı (Dosyalarım) ────────────────────────────────────
+function StoragePage() {
+  const { theme } = useTheme();
+  const [files, setFiles] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>({ totalFiles: 0, totalSize: 0 });
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+
+  useEffect(() => {
+    fetchFiles();
+    fetchStats();
+  }, [categoryFilter]);
+
+  const fetchFiles = async () => {
+    setLoading(true);
+    try {
+      const url = categoryFilter
+        ? `${API_BASE}/storage/list?category=${encodeURIComponent(categoryFilter)}`
+        : `${API_BASE}/storage/list`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFiles(data.files || []);
+      }
+    } catch (err: any) {
+      setError('Dosyalar yüklenemedi: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/storage/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (err: any) {
+      // stats optiksel, hata görmezden gel
+    }
+  };
+
+  // Format boyut
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // Dosya yükleme
+  const handleUpload = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setUploading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', fileList[0]);
+
+      const response = await fetch(`${API_BASE}/storage/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess(`"${data.file?.originalName || fileList[0].name}" yüklendi`);
+        fetchFiles();
+        fetchStats();
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.message || 'Dosya yüklenemedi');
+      }
+    } catch (err: any) {
+      setError('Yükleme hatası: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Dosya sil
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Bu dosyayı silmek istediğinize emin misiniz?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/storage/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        fetchFiles();
+        fetchStats();
+      } else {
+        setError('Dosya silinemedi');
+      }
+    } catch (err: any) {
+      setError('Silme hatası: ' + err.message);
+    }
+  };
+
+  // Sürükle-bırak
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+  const handleDragLeave = () => setDragOver(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleUpload(e.dataTransfer.files);
+  };
+
+  // Kategoriler
+  const categories = [...new Set(files.map(f => f.category || f.type || 'genel').filter(Boolean))];
+
+  return (
+    <div className={`p-6 max-w-6xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>📁 Dosyalarım</h1>
+        <div className="flex gap-2">
+          <a href="/overview" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Genel Bakış
+          </a>
+        </div>
+      </div>
+
+      {/* Hata / Başarı */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          ⚠️ {error}
+          <button onClick={() => setError('')} className="ml-2 font-bold">&times;</button>
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          ✅ {success}
+        </div>
+      )}
+
+      {/* Özet İstatistikler */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className={`p-4 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📄</span>
+            <div>
+              <p className={`text-sm ${textSecondary(theme)}`}>Toplam Dosya</p>
+              <p className={`text-xl font-bold ${textPrimary(theme)}`}>{stats.totalFiles || files.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className={`p-4 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">💾</span>
+            <div>
+              <p className={`text-sm ${textSecondary(theme)}`}>Toplam Boyut</p>
+              <p className={`text-xl font-bold ${textPrimary(theme)}`}>{stats.totalSize ? formatSize(stats.totalSize) : '—'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Yükleme Alanı */}
+      <div
+        className={`mb-6 rounded-xl border-2 border-dashed p-8 text-center transition-colors cursor-pointer ${
+          dragOver
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+            : `${borderColor2(theme)} ${bgCard(theme)}`
+        }`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => document.getElementById('file-input')?.click()}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-4xl">📤</span>
+          <p className={`font-medium ${textPrimary(theme)}`}>
+            {uploading ? '🔄 Yükleniyor...' : 'Dosyayı sürükleyip bırakın veya tıklayın'}
+          </p>
+          <p className={`text-xs ${textSecondary(theme)}`}>PDF, Excel, Görsel, Herhangi bir dosya</p>
+          <button
+            disabled={uploading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+            onClick={(e) => {
+              e.stopPropagation();
+              document.getElementById('file-input')?.click();
+            }}
+          >
+            {uploading ? 'Yükleniyor...' : '📎 Dosya Seç'}
+          </button>
+          <input
+            id="file-input"
+            type="file"
+            className="hidden"
+            onChange={(e) => handleUpload(e.target.files)}
+            disabled={uploading}
+          />
+        </div>
+      </div>
+
+      {/* Kategori Filtresi */}
+      {categories.length > 0 && (
+        <div className="mb-4 flex gap-2 flex-wrap">
+          <button
+            onClick={() => setCategoryFilter('')}
+            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+              !categoryFilter
+                ? 'bg-blue-600 text-white border-blue-600'
+                : `${bgCard(theme)} ${textMuted(theme)} ${borderColor(theme)}`
+            }`}
+          >
+            Tümü
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                categoryFilter === cat
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : `${bgCard(theme)} ${textMuted(theme)} ${borderColor(theme)}`
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Dosya Listesi */}
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+        {loading ? (
+          <div className="p-8 text-center"><p className={textSecondary(theme)}>Yükleniyor...</p></div>
+        ) : files.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className={textSecondary(theme)}>Henüz dosya yok</p>
+            <p className={`text-xs mt-1 ${textMuted(theme)}`}>Yukarıdan dosya yükleyerek başlayın</p>
+          </div>
+        ) : (
+          <div className={`divide-y ${borderColor2(theme)}`}>
+            {files.map((file: any) => (
+              <div
+                key={file.id}
+                className={`flex items-center justify-between px-4 py-3 transition-colors ${
+                  theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-lg">📄</span>
+                  <div className="min-w-0">
+                    <p className={`font-medium text-sm truncate ${textPrimary(theme)}`}>
+                      {file.originalName || file.fileName || 'İsimsiz dosya'}
+                    </p>
+                    <p className={`text-xs ${textMuted(theme)}`}>
+                      {formatSize(file.size || file.sizeBytes || 0)}
+                      {file.category ? ` • ${file.category}` : ''}
+                      {file.uploadedAt ? ` • ${new Date(file.uploadedAt).toLocaleDateString('tr-TR')}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`${API_BASE}/storage/download/${file.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium"
+                  >
+                    ⬇️ İndir
+                  </a>
+                  <button
+                    onClick={() => handleDelete(file.id)}
+                    className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                  >
+                    🗑️ Sil
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Bilgi */}
+      <div className={`mt-6 p-4 rounded-xl border ${bgCard(theme)} ${borderColor(theme)}`}>
+        <p className={`text-xs ${textSecondary(theme)}`}>
+          💡 Yüklenen dosyalar sunucuda güvenli bir şekilde saklanır. Farklı cihazlardan giriş yaptığınızda
+          aynı hesapla tüm dosyalarınıza erişebilirsiniz.
+        </p>
+      </div>
     </div>
   );
 }

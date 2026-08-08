@@ -286,7 +286,25 @@ export async function getExams() {
   return data;
 }
 
+export interface ExamDetail extends Exam {
+  examType?: 'TYT' | 'AYT' | 'LGS' | 'custom' | null;
+  relatedExamId?: number | null;
+  totalScore?: number;
+  questions: ExamQuestionInput[];
+  classIds: number[];
+}
+
+export async function getExamById(id: number) {
+  const { data } = await api.get<ExamDetail>(`/exams/${id}`);
+  return data;
+}
+
 export async function createExam(input: CreateExamInput) {
   const { data } = await api.post<Exam>('/exams', input);
+  return data;
+}
+
+export async function updateExam(id: number, input: Partial<CreateExamInput>) {
+  const { data } = await api.put<Exam>(`/exams/${id}`, input);
   return data;
 }

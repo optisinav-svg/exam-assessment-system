@@ -13,8 +13,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { studentRegisterRequest, lookupSchoolByCode, SchoolLookupResult } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function StudentRegisterScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -105,7 +107,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.logo}>🎓</Text>
@@ -116,7 +118,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
           <View style={styles.form}>
             <Text style={styles.label}>Ad Soyad</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="Ali Yılmaz"
               value={fullName}
               onChangeText={setFullName}
@@ -125,7 +127,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>E-posta</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="ornek@mail.com"
               value={email}
               onChangeText={setEmail}
@@ -136,7 +138,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>Şifre</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="En az 6 karakter"
               value={password}
               onChangeText={setPassword}
@@ -146,7 +148,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>Şifre (Tekrar)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="••••••••"
               value={passwordConfirm}
               onChangeText={setPasswordConfirm}
@@ -156,7 +158,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>Öğrenci Numarası (varsa)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="Örn. 105"
               value={studentNo}
               onChangeText={setStudentNo}
@@ -251,7 +253,7 @@ export default function StudentRegisterScreen({ navigation }: any) {
               <>
                 <Text style={styles.label}>Öğretmeninizin E-postası</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
                   placeholder="ogretmen@okul.com"
                   value={teacherEmail}
                   onChangeText={setTeacherEmail}

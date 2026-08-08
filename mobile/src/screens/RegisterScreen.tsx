@@ -13,8 +13,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function RegisterScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const { register, isSubmitting } = useAuth();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -49,7 +51,7 @@ export default function RegisterScreen({ navigation }: any) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.logo}>📝</Text>
@@ -60,7 +62,7 @@ export default function RegisterScreen({ navigation }: any) {
           <View style={styles.form}>
             <Text style={styles.label}>Ad Soyad</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="Ayşe Yılmaz"
               value={fullName}
               onChangeText={setFullName}
@@ -69,7 +71,7 @@ export default function RegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>E-posta</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="ornek@okul.com"
               value={email}
               onChangeText={setEmail}
@@ -80,7 +82,7 @@ export default function RegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>Şifre</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="En az 6 karakter"
               value={password}
               onChangeText={setPassword}
@@ -90,7 +92,7 @@ export default function RegisterScreen({ navigation }: any) {
 
             <Text style={styles.label}>Şifre (Tekrar)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.border, color: colors.text }]}
               placeholder="••••••••"
               value={passwordConfirm}
               onChangeText={setPasswordConfirm}
