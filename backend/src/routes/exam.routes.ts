@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../index';
-import { exams, examClasses, results } from '../../../shared/schema';
+import { exams, examClasses, results, examQuestions } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 const router = Router();
@@ -19,6 +19,31 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// Tek bir sınavı, sorularıyla birlikte getir (düzenleme ekranı için)
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const examId = parseInt(req.params.id);
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
+    if (!exam) {
+      return res.status(404).json({ message: 'Sınav bulunamadı' });
+    }
+    const questions = await db
+      .select()
+      .from(examQuestions)
+      .where(eq(examQuestions.examId, examId))
+      .orderBy(examQuestions.questionNumber);
+    const classAssignments = await db.select().from(examClasses).where(eq(examClasses.examId, examId));
+
+    res.json({
+      ...exam,
+      questions,
+      classIds: classAssignments.map((c) => c.classId),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Sınav getirilirken hata oluştu', error });
+  }
+});
+
 // Yeni sınav oluştur
 router.post('/', async (req: Request, res: Response) => {
   try {
@@ -33,6 +58,10 @@ router.post('/', async (req: Request, res: Response) => {
       classIds,
       optionCount, // 3, 4 veya 5 (varsayılan 4)
       negativeMarking, // yanlış doğruyu eksiltsin mi (varsayılan true)
+      examType, // 'TYT' | 'AYT' | 'LGS' | 'custom'
+      relatedExamId, // AYT ise, hangi TYT sınavıyla eşleştiği
+      totalScore, // sınavın tam puanı (varsayılan 100)
+      questions, // [{ questionNumber, subjectId, learningOutcomeId?, customOutcomeText?, correctAnswer }]
     } = req.body;
     const teacherId = req.user?.id;
 
@@ -48,6 +77,9 @@ router.post('/', async (req: Request, res: Response) => {
       optionCount: optionCount ?? 4,
       negativeMarking: negativeMarking ?? true,
       status: 'draft',
+      examType: examType ?? null,
+      relatedExamId: relatedExamId ?? null,
+      totalScore: totalScore ?? 100,
       createdAt: new Date(),
     }).returning();
 
@@ -58,8 +90,23 @@ router.post('/', async (req: Request, res: Response) => {
       );
     }
 
+    // Soru bazlı ders/kazanım eşlemesini kaydet
+    if (questions && Array.isArray(questions) && questions.length > 0) {
+      await db.insert(examQuestions).values(
+        questions.map((q: any) => ({
+          examId: exam.id,
+          questionNumber: q.questionNumber,
+          subjectId: q.subjectId ?? null,
+          learningOutcomeId: q.learningOutcomeId ?? null,
+          customOutcomeText: q.customOutcomeText ?? null,
+          correctAnswer: q.correctAnswer,
+        }))
+      );
+    }
+
     res.status(201).json(exam);
   } catch (error) {
+    console.error('Exam create error:', error);
     res.status(500).json({ message: 'Sınav oluşturulurken hata oluştu', error });
   }
 });

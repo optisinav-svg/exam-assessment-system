@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -15,7 +15,15 @@ import {
   getSubjects,
   createSubject,
   createExam,
+  getExams,
+  getSchools,
+  getClassesBySchool,
+  searchLearningOutcomes,
   Subject,
+  Exam,
+  School,
+  SchoolClass,
+  LearningOutcome,
 } from '../services/api';
 
 const OPTION_LETTERS: Record<number, string[]> = {
@@ -23,6 +31,45 @@ const OPTION_LETTERS: Record<number, string[]> = {
   4: ['A', 'B', 'C', 'D'],
   5: ['A', 'B', 'C', 'D', 'E'],
 };
+
+// ─── TYT / AYT / LGS resmi ders-soru sayısı matrisleri ─────────────────────
+type ExamMode = 'TYT' | 'AYT' | 'LGS' | 'custom';
+
+const TYT_SUBJECTS: { name: string; count: number }[] = [
+  { name: 'Türkçe', count: 40 },
+  { name: 'Tarih', count: 5 },
+  { name: 'Coğrafya', count: 5 },
+  { name: 'Felsefe', count: 5 },
+  { name: 'Din Kültürü ve Ahlak Bilgisi', count: 5 },
+  { name: 'Matematik', count: 30 },
+  { name: 'Geometri', count: 10 },
+  { name: 'Fizik', count: 7 },
+  { name: 'Kimya', count: 7 },
+  { name: 'Biyoloji', count: 6 },
+];
+
+const AYT_SUBJECTS: { name: string; count: number }[] = [
+  { name: 'Türk Dili ve Edebiyatı', count: 24 },
+  { name: 'Tarih-1', count: 10 },
+  { name: 'Coğrafya-1', count: 6 },
+  { name: 'Matematik', count: 40 },
+  { name: 'Tarih-2', count: 11 },
+  { name: 'Coğrafya-2', count: 11 },
+  { name: 'Felsefe Grubu (Felsefe, Psikoloji, Sosyoloji, Mantık)', count: 12 },
+  { name: 'Din Kültürü ve Ahlak Bilgisi-2', count: 6 },
+  { name: 'Fizik', count: 14 },
+  { name: 'Kimya', count: 13 },
+  { name: 'Biyoloji', count: 13 },
+];
+
+const LGS_SUBJECTS: { name: string; count: number }[] = [
+  { name: 'Türkçe', count: 20 },
+  { name: 'T.C. İnkılap Tarihi ve Atatürkçülük', count: 10 },
+  { name: 'Din Kültürü ve Ahlak Bilgisi', count: 10 },
+  { name: 'Yabancı Dil', count: 10 },
+  { name: 'Matematik', count: 20 },
+  { name: 'Fen Bilimleri', count: 20 },
+];
 
 function todayIso(): string {
   const d = new Date();
@@ -32,54 +79,213 @@ function todayIso(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+interface SubjectBlock {
+  name: string;
+  count: number;
+  subjectId: number | null;
+}
+
+interface QuestionOutcome {
+  learningOutcomeId?: number;
+  learningOutcomeLabel?: string;
+  customText?: string;
+}
+
 export default function CreateExamScreen({ navigation }: any) {
   const [title, setTitle] = useState('');
   const [examDate, setExamDate] = useState(todayIso());
-  const [totalQuestions, setTotalQuestions] = useState('10');
+  const [totalScore, setTotalScore] = useState('100');
   const [optionCount, setOptionCount] = useState<3 | 4 | 5>(4);
   const [negativeMarking, setNegativeMarking] = useState(true);
-  const [correctAnswers, setCorrectAnswers] = useState<Record<string, string>>({});
 
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
-  const [newSubjectName, setNewSubjectName] = useState('');
-  const [isAddingSubject, setIsAddingSubject] = useState(false);
+  const [examMode, setExamMode] = useState<ExamMode>('custom');
+  const [subjectBlocks, setSubjectBlocks] = useState<SubjectBlock[]>([]);
+
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectCount, setNewSubjectCount] = useState('10');
+
+  const [correctAnswers, setCorrectAnswers] = useState<Record<string, string>>({});
+  const [questionOutcomes, setQuestionOutcomes] = useState<Record<string, QuestionOutcome>>({});
+  const [activeSearchQuestion, setActiveSearchQuestion] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<LearningOutcome[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const [relatedTytExamId, setRelatedTytExamId] = useState<number | null>(null);
+  const [tytExams, setTytExams] = useState<Exam[]>([]);
+
+  const [schools, setSchools] = useState<School[]>([]);
+  const [classesBySchool, setClassesBySchool] = useState<Record<number, SchoolClass[]>>({});
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [isLoadingSchools, setIsLoadingSchools] = useState(true);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadSubjects();
+    (async () => {
+      try {
+        const data = await getSubjects();
+        setAllSubjects(data);
+      } catch (error) {
+        // sessiz geç
+      } finally {
+        setIsLoadingSubjects(false);
+      }
+    })();
+
+    (async () => {
+      try {
+        const schoolList = await getSchools();
+        setSchools(schoolList);
+        for (const s of schoolList) {
+          try {
+            const classes = await getClassesBySchool(s.id);
+            setClassesBySchool((prev) => ({ ...prev, [s.id]: classes }));
+          } catch (e) {
+            // sessiz geç
+          }
+        }
+      } catch (error) {
+        // sessiz geç
+      } finally {
+        setIsLoadingSchools(false);
+      }
+    })();
   }, []);
 
-  const loadSubjects = async () => {
-    try {
-      const data = await getSubjects();
-      setSubjects(data);
-    } catch (error) {
-      // Ders listesi alınamazsa sessizce devam et, ders seçimi olmadan da sınav oluşturulabilir
-    } finally {
-      setIsLoadingSubjects(false);
+  const applyExamMode = (mode: ExamMode) => {
+    setExamMode(mode);
+    setCorrectAnswers({});
+    setQuestionOutcomes({});
+    setRelatedTytExamId(null);
+
+    let matrix: { name: string; count: number }[] = [];
+    if (mode === 'TYT') matrix = TYT_SUBJECTS;
+    else if (mode === 'AYT') matrix = AYT_SUBJECTS;
+    else if (mode === 'LGS') matrix = LGS_SUBJECTS;
+
+    if (mode === 'custom') {
+      setSubjectBlocks([]);
+    } else {
+      setSubjectBlocks(matrix.map((m) => ({ name: m.name, count: m.count, subjectId: null })));
+    }
+
+    if (mode === 'AYT') {
+      loadTytExams();
     }
   };
 
-  const handleAddSubject = async () => {
+  const loadTytExams = async () => {
+    try {
+      const exams = await getExams();
+      setTytExams(exams.filter((e: any) => e.examType === 'TYT'));
+    } catch (error) {
+      // sessiz geç
+    }
+  };
+
+  const addExistingSubjectBlock = (subject: Subject) => {
+    if (subjectBlocks.some((b) => b.subjectId === subject.id)) return;
+    setSubjectBlocks((prev) => [...prev, { name: subject.name, count: 10, subjectId: subject.id }]);
+  };
+
+  const addNewSubjectBlock = async () => {
     if (!newSubjectName.trim()) return;
+    const count = Math.max(1, Math.min(100, parseInt(newSubjectCount, 10) || 10));
     try {
       const created = await createSubject(newSubjectName.trim());
-      setSubjects((prev) => [...prev, created]);
-      setSelectedSubjectId(created.id);
+      setAllSubjects((prev) => [...prev, created]);
+      setSubjectBlocks((prev) => [...prev, { name: created.name, count, subjectId: created.id }]);
       setNewSubjectName('');
-      setIsAddingSubject(false);
+      setNewSubjectCount('10');
     } catch (error) {
       Alert.alert('Hata', 'Ders eklenemedi. Lütfen tekrar deneyin.');
     }
   };
 
-  const questionCount = Math.max(0, Math.min(200, parseInt(totalQuestions, 10) || 0));
+  const removeSubjectBlock = (index: number) => {
+    setSubjectBlocks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateBlockCount = (index: number, count: string) => {
+    const n = Math.max(1, Math.min(100, parseInt(count, 10) || 1));
+    setSubjectBlocks((prev) => prev.map((b, i) => (i === index ? { ...b, count: n } : b)));
+  };
+
+  const flattenedQuestions = useMemo(() => {
+    const list: { globalNo: number; blockIndex: number; subjectName: string }[] = [];
+    let counter = 1;
+    subjectBlocks.forEach((block, blockIndex) => {
+      for (let i = 0; i < block.count; i++) {
+        list.push({ globalNo: counter, blockIndex, subjectName: block.name });
+        counter++;
+      }
+    });
+    return list;
+  }, [subjectBlocks]);
+
+  const totalQuestions = flattenedQuestions.length;
   const letters = OPTION_LETTERS[optionCount];
 
-  const setAnswer = (questionNo: number, letter: string) => {
-    setCorrectAnswers((prev) => ({ ...prev, [String(questionNo)]: letter }));
+  const setAnswer = (globalNo: number, letter: string) => {
+    setCorrectAnswers((prev) => ({ ...prev, [String(globalNo)]: letter }));
+  };
+
+  const openOutcomeSearch = (globalNo: number) => {
+    setActiveSearchQuestion(activeSearchQuestion === globalNo ? null : globalNo);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const runOutcomeSearch = async (globalNo: number, blockIndex: number, text: string) => {
+    setSearchQuery(text);
+    const block = subjectBlocks[blockIndex];
+    if (!block?.subjectId || text.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await searchLearningOutcomes(block.subjectId, text.trim());
+      setSearchResults(results);
+    } catch (error) {
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const selectOutcome = (globalNo: number, outcome: LearningOutcome) => {
+    setQuestionOutcomes((prev) => ({
+      ...prev,
+      [String(globalNo)]: {
+        learningOutcomeId: outcome.id,
+        learningOutcomeLabel: `${outcome.code} — ${outcome.description.slice(0, 40)}${
+          outcome.description.length > 40 ? '…' : ''
+        }`,
+      },
+    }));
+    setActiveSearchQuestion(null);
+  };
+
+  const setCustomOutcomeText = (globalNo: number, text: string) => {
+    setQuestionOutcomes((prev) => ({ ...prev, [String(globalNo)]: { customText: text } }));
+  };
+
+  const clearOutcome = (globalNo: number) => {
+    setQuestionOutcomes((prev) => {
+      const next = { ...prev };
+      delete next[String(globalNo)];
+      return next;
+    });
+  };
+
+  const toggleClass = (classId: number) => {
+    setSelectedClassIds((prev) =>
+      prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]
+    );
   };
 
   const handleSubmit = async () => {
@@ -91,33 +297,74 @@ export default function CreateExamScreen({ navigation }: any) {
       Alert.alert('Geçersiz tarih', 'Tarihi YYYY-AA-GG formatında girin (örn. 2026-08-03).');
       return;
     }
-    if (questionCount <= 0) {
-      Alert.alert('Eksik bilgi', 'Toplam soru sayısı 1 veya daha fazla olmalı.');
+    if (subjectBlocks.length === 0) {
+      Alert.alert(
+        'Eksik bilgi',
+        examMode === 'custom' ? 'En az bir ders ekleyin.' : 'Bir sorun oluştu, sınav türünü yeniden seçin.'
+      );
+      return;
+    }
+    if (examMode === 'AYT' && !relatedTytExamId) {
+      Alert.alert(
+        'TYT eşleştirmesi gerekli',
+        'AYT sınavları TYT netleriyle birlikte puanlandığı için, bu sınavın hangi TYT sınavına ait olduğunu seçmelisiniz.'
+      );
       return;
     }
 
-    const answeredCount = Object.keys(correctAnswers).filter(
-      (k) => Number(k) <= questionCount
-    ).length;
-    if (answeredCount < questionCount) {
+    const answeredCount = flattenedQuestions.filter((q) => correctAnswers[String(q.globalNo)]).length;
+    if (answeredCount < totalQuestions) {
       Alert.alert(
         'Cevap anahtarı eksik',
-        `${questionCount} sorudan ${answeredCount} tanesinin doğru cevabını işaretlediniz. Eksik soruların doğru cevabını seçin.`
+        `${totalQuestions} sorudan ${answeredCount} tanesinin doğru cevabını işaretlediniz. Eksik soruların doğru cevabını seçin.`
       );
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const resolvedBlocks = [...subjectBlocks];
+      for (let i = 0; i < resolvedBlocks.length; i++) {
+        if (!resolvedBlocks[i].subjectId) {
+          const existing = allSubjects.find(
+            (s) => s.name.toLowerCase() === resolvedBlocks[i].name.toLowerCase()
+          );
+          if (existing) {
+            resolvedBlocks[i].subjectId = existing.id;
+          } else {
+            const created = await createSubject(resolvedBlocks[i].name);
+            setAllSubjects((prev) => [...prev, created]);
+            resolvedBlocks[i].subjectId = created.id;
+          }
+        }
+      }
+
+      const questions = flattenedQuestions.map((q) => {
+        const outcome = questionOutcomes[String(q.globalNo)];
+        return {
+          questionNumber: q.globalNo,
+          subjectId: resolvedBlocks[q.blockIndex].subjectId!,
+          learningOutcomeId: outcome?.learningOutcomeId,
+          customOutcomeText: outcome?.customText,
+          correctAnswer: correctAnswers[String(q.globalNo)],
+        };
+      });
+
       await createExam({
         title: title.trim(),
-        subjectId: selectedSubjectId || undefined,
+        subjectId: resolvedBlocks.length === 1 ? resolvedBlocks[0].subjectId! : undefined,
         examDate,
-        totalQuestions: questionCount,
+        totalQuestions,
         correctAnswers,
         optionCount,
         negativeMarking,
+        examType: examMode,
+        relatedExamId: examMode === 'AYT' ? relatedTytExamId! : undefined,
+        totalScore: Math.max(1, parseInt(totalScore, 10) || 100),
+        classIds: selectedClassIds,
+        questions,
       });
+
       Alert.alert('Başarılı', 'Sınav oluşturuldu.', [
         { text: 'Tamam', onPress: () => navigation.goBack() },
       ]);
@@ -143,7 +390,7 @@ export default function CreateExamScreen({ navigation }: any) {
         <Text style={styles.label}>Sınav Başlığı</Text>
         <TextInput
           style={styles.input}
-          placeholder="Örn. 1. Dönem Matematik Sınavı"
+          placeholder="Örn. 1. Dönem Genel Deneme"
           value={title}
           onChangeText={setTitle}
           editable={!isSubmitting}
@@ -158,85 +405,120 @@ export default function CreateExamScreen({ navigation }: any) {
           editable={!isSubmitting}
         />
 
-        <Text style={styles.label}>Ders (isteğe bağlı)</Text>
-        {isLoadingSubjects ? (
-          <ActivityIndicator color="#4A6CF7" />
-        ) : (
-          <View style={styles.chipRow}>
-            {subjects.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                style={[
-                  styles.chip,
-                  selectedSubjectId === s.id && styles.chipActive,
-                ]}
-                onPress={() =>
-                  setSelectedSubjectId(selectedSubjectId === s.id ? null : s.id)
-                }
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    selectedSubjectId === s.id && styles.chipTextActive,
-                  ]}
-                >
-                  {s.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        <Text style={[styles.label, { marginTop: 20 }]}>Sınav Türü</Text>
+        <View style={styles.modeRow}>
+          {(['TYT', 'AYT', 'LGS', 'custom'] as ExamMode[]).map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.modeButton, examMode === mode && styles.modeButtonActive]}
+              onPress={() => applyExamMode(mode)}
+              disabled={isSubmitting}
+            >
+              <Text style={[styles.modeButtonText, examMode === mode && styles.modeButtonTextActive]}>
+                {mode === 'custom' ? 'Konu Taraması' : mode}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-            {isAddingSubject ? (
-              <View style={styles.addSubjectRow}>
-                <TextInput
-                  style={styles.addSubjectInput}
-                  placeholder="Ders adı"
-                  value={newSubjectName}
-                  onChangeText={setNewSubjectName}
-                  autoFocus
-                />
-                <TouchableOpacity style={styles.addSubjectButton} onPress={handleAddSubject}>
-                  <Text style={styles.addSubjectButtonText}>Ekle</Text>
-                </TouchableOpacity>
-              </View>
+        {examMode === 'AYT' && (
+          <View style={styles.tytLinkBox}>
+            <Text style={styles.label}>Hangi TYT sınavının netleriyle birlikte puanlanacak?</Text>
+            {tytExams.length === 0 ? (
+              <Text style={styles.helperText}>
+                Henüz tanımlı bir TYT sınavı yok. Önce TYT sınavını oluşturun.
+              </Text>
             ) : (
-              <TouchableOpacity
-                style={styles.chip}
-                onPress={() => setIsAddingSubject(true)}
-              >
-                <Text style={styles.chipText}>+ Yeni Ders</Text>
-              </TouchableOpacity>
+              <View style={styles.chipRow}>
+                {tytExams.map((e) => (
+                  <TouchableOpacity
+                    key={e.id}
+                    style={[styles.chip, relatedTytExamId === e.id && styles.chipActive]}
+                    onPress={() => setRelatedTytExamId(e.id)}
+                  >
+                    <Text style={[styles.chipText, relatedTytExamId === e.id && styles.chipTextActive]}>
+                      {e.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
           </View>
         )}
 
-        <Text style={styles.label}>Toplam Soru Sayısı</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Örn. 20"
-          value={totalQuestions}
-          onChangeText={setTotalQuestions}
-          keyboardType="number-pad"
-          editable={!isSubmitting}
-        />
+        {examMode === 'custom' && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.label}>Dersler</Text>
+            {isLoadingSubjects ? (
+              <ActivityIndicator color="#4A6CF7" />
+            ) : (
+              <View style={styles.chipRow}>
+                {allSubjects
+                  .filter((s) => !subjectBlocks.some((b) => b.subjectId === s.id))
+                  .map((s) => (
+                    <TouchableOpacity key={s.id} style={styles.chip} onPress={() => addExistingSubjectBlock(s)}>
+                      <Text style={styles.chipText}>+ {s.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
+            <View style={styles.addSubjectRow}>
+              <TextInput
+                style={styles.addSubjectInput}
+                placeholder="Yeni ders adı"
+                value={newSubjectName}
+                onChangeText={setNewSubjectName}
+              />
+              <TextInput
+                style={styles.addSubjectCountInput}
+                placeholder="Soru"
+                value={newSubjectCount}
+                onChangeText={setNewSubjectCount}
+                keyboardType="number-pad"
+              />
+              <TouchableOpacity style={styles.addSubjectButton} onPress={addNewSubjectBlock}>
+                <Text style={styles.addSubjectButtonText}>Ekle</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {subjectBlocks.length > 0 && (
+          <View style={{ marginTop: 16 }}>
+            {subjectBlocks.map((block, index) => (
+              <View key={index} style={styles.subjectBlockHeader}>
+                <Text style={styles.subjectBlockName}>{block.name}</Text>
+                {examMode === 'custom' ? (
+                  <View style={styles.subjectBlockCountRow}>
+                    <TextInput
+                      style={styles.subjectBlockCountInput}
+                      value={String(block.count)}
+                      onChangeText={(t) => updateBlockCount(index, t)}
+                      keyboardType="number-pad"
+                    />
+                    <Text style={styles.helperText}> soru</Text>
+                    <TouchableOpacity onPress={() => removeSubjectBlock(index)} style={{ marginLeft: 8 }}>
+                      <Text style={{ color: '#EF4444', fontWeight: '700' }}>Kaldır</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <Text style={styles.helperText}>{block.count} soru</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.label}>Seçenek Sayısı</Text>
         <View style={styles.optionCountRow}>
           {[3, 4, 5].map((n) => (
             <TouchableOpacity
               key={n}
-              style={[
-                styles.optionCountButton,
-                optionCount === n && styles.optionCountButtonActive,
-              ]}
+              style={[styles.optionCountButton, optionCount === n && styles.optionCountButtonActive]}
               onPress={() => setOptionCount(n as 3 | 4 | 5)}
               disabled={isSubmitting}
             >
-              <Text
-                style={[
-                  styles.optionCountText,
-                  optionCount === n && styles.optionCountTextActive,
-                ]}
-              >
+              <Text style={[styles.optionCountText, optionCount === n && styles.optionCountTextActive]}>
                 {n} Seçenekli
               </Text>
             </TouchableOpacity>
@@ -246,52 +528,148 @@ export default function CreateExamScreen({ navigation }: any) {
         <View style={styles.switchRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Yanlışlar Doğruyu Eksiltsin</Text>
-            <Text style={styles.helperText}>
-              {optionCount === 5
-                ? '4 yanlış, 1 doğruyu eksiltir'
-                : optionCount === 4
-                ? '3 yanlış, 1 doğruyu eksiltir'
-                : '2 yanlış, 1 doğruyu eksiltir'}
-            </Text>
           </View>
           <Switch value={negativeMarking} onValueChange={setNegativeMarking} disabled={isSubmitting} />
         </View>
 
-        {questionCount > 0 && (
+        <Text style={styles.label}>Sınavın Tam Puanı</Text>
+        <TextInput
+          style={styles.input}
+          value={totalScore}
+          onChangeText={setTotalScore}
+          keyboardType="number-pad"
+          editable={!isSubmitting}
+        />
+        <Text style={styles.helperText}>Tüm sorular doğru olursa öğrenci bu puanı alır (varsayılan 100).</Text>
+
+        <Text style={[styles.label, { marginTop: 20 }]}>Hangi Sınıflara Uygulanacak</Text>
+        {isLoadingSchools ? (
+          <ActivityIndicator color="#4A6CF7" />
+        ) : schools.length === 0 ? (
+          <Text style={styles.helperText}>
+            Henüz tanımlı okul/sınıf yok. Web panelinden okul ve sınıf ekleyebilirsiniz.
+          </Text>
+        ) : (
+          schools.map((school) => (
+            <View key={school.id} style={{ marginBottom: 8 }}>
+              <Text style={styles.schoolName}>{school.name}</Text>
+              <View style={styles.chipRow}>
+                {(classesBySchool[school.id] || []).map((cls) => (
+                  <TouchableOpacity
+                    key={cls.id}
+                    style={[styles.chip, selectedClassIds.includes(cls.id) && styles.chipActive]}
+                    onPress={() => toggleClass(cls.id)}
+                  >
+                    <Text
+                      style={[styles.chipText, selectedClassIds.includes(cls.id) && styles.chipTextActive]}
+                    >
+                      {cls.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))
+        )}
+
+        {totalQuestions > 0 && (
           <>
-            <Text style={[styles.label, { marginTop: 20 }]}>Cevap Anahtarı</Text>
+            <Text style={[styles.label, { marginTop: 20 }]}>Cevap Anahtarı ve Kazanımlar</Text>
             <Text style={styles.helperText}>
-              Her sorunun doğru cevabını seçin ({Object.keys(correctAnswers).filter(k => Number(k) <= questionCount).length}/{questionCount} tamamlandı)
+              Her sorunun doğru cevabını seçin (
+              {Object.keys(correctAnswers).filter((k) => Number(k) <= totalQuestions).length}/{totalQuestions}{' '}
+              tamamlandı). Kazanım seçimi isteğe bağlıdır.
             </Text>
 
             <View style={styles.answersGrid}>
-              {Array.from({ length: questionCount }, (_, i) => i + 1).map((q) => (
-                <View key={q} style={styles.answerRow}>
-                  <Text style={styles.answerQuestionNo}>{q}.</Text>
-                  <View style={styles.answerLetters}>
-                    {letters.map((letter) => (
-                      <TouchableOpacity
-                        key={letter}
-                        style={[
-                          styles.letterButton,
-                          correctAnswers[String(q)] === letter && styles.letterButtonActive,
-                        ]}
-                        onPress={() => setAnswer(q, letter)}
-                        disabled={isSubmitting}
-                      >
-                        <Text
-                          style={[
-                            styles.letterText,
-                            correctAnswers[String(q)] === letter && styles.letterTextActive,
-                          ]}
-                        >
-                          {letter}
+              {flattenedQuestions.map((q) => {
+                const outcome = questionOutcomes[String(q.globalNo)];
+                return (
+                  <View key={q.globalNo} style={styles.answerBlock}>
+                    <View style={styles.answerRow}>
+                      <View style={{ width: 70 }}>
+                        <Text style={styles.answerQuestionNo}>{q.globalNo}.</Text>
+                        <Text style={styles.answerSubjectLabel} numberOfLines={1}>
+                          {q.subjectName}
                         </Text>
-                      </TouchableOpacity>
-                    ))}
+                      </View>
+                      <View style={styles.answerLetters}>
+                        {letters.map((letter) => (
+                          <TouchableOpacity
+                            key={letter}
+                            style={[
+                              styles.letterButton,
+                              correctAnswers[String(q.globalNo)] === letter && styles.letterButtonActive,
+                            ]}
+                            onPress={() => setAnswer(q.globalNo, letter)}
+                            disabled={isSubmitting}
+                          >
+                            <Text
+                              style={[
+                                styles.letterText,
+                                correctAnswers[String(q.globalNo)] === letter && styles.letterTextActive,
+                              ]}
+                            >
+                              {letter}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    <TouchableOpacity style={styles.outcomeButton} onPress={() => openOutcomeSearch(q.globalNo)}>
+                      <Text style={styles.outcomeButtonText} numberOfLines={1}>
+                        {outcome?.learningOutcomeLabel ||
+                          outcome?.customText ||
+                          '🎯 Kazanım seç veya yaz (isteğe bağlı)'}
+                      </Text>
+                      {outcome && (
+                        <TouchableOpacity onPress={() => clearOutcome(q.globalNo)}>
+                          <Text style={{ color: '#EF4444', fontWeight: '700', marginLeft: 8 }}>✕</Text>
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+
+                    {activeSearchQuestion === q.globalNo && (
+                      <View style={styles.outcomeSearchBox}>
+                        <TextInput
+                          style={styles.outcomeSearchInput}
+                          placeholder="Kazanım ara (en az 2 harf)..."
+                          value={searchQuery}
+                          onChangeText={(t) => runOutcomeSearch(q.globalNo, q.blockIndex, t)}
+                          autoFocus
+                        />
+                        {isSearching && <ActivityIndicator color="#4A6CF7" style={{ marginTop: 6 }} />}
+                        {searchResults.map((r) => (
+                          <TouchableOpacity
+                            key={r.id}
+                            style={styles.outcomeResultRow}
+                            onPress={() => selectOutcome(q.globalNo, r)}
+                          >
+                            <Text style={styles.outcomeResultCode}>{r.code}</Text>
+                            <Text style={styles.outcomeResultText} numberOfLines={2}>
+                              {r.description}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                        {searchQuery.trim().length >= 2 && !isSearching && (
+                          <TouchableOpacity
+                            style={styles.outcomeCustomButton}
+                            onPress={() => {
+                              setCustomOutcomeText(q.globalNo, searchQuery.trim());
+                              setActiveSearchQuestion(null);
+                            }}
+                          >
+                            <Text style={styles.outcomeCustomButtonText}>
+                              "{searchQuery.trim()}" olarak kendim yazayım
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </>
         )}
@@ -313,10 +691,7 @@ export default function CreateExamScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F0F4FF',
-  },
+  container: { flex: 1, backgroundColor: '#F0F4FF' },
   header: {
     padding: 20,
     paddingTop: 12,
@@ -324,33 +699,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-    marginTop: 16,
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 8,
-  },
+  backButtonText: { color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 8 },
+  title: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  content: { padding: 20, paddingBottom: 40 },
+  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 6, marginTop: 16 },
+  helperText: { fontSize: 12, color: '#888', marginBottom: 8 },
   input: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -360,11 +713,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  modeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  modeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
+  modeButtonActive: { backgroundColor: '#4A6CF7', borderColor: '#4A6CF7' },
+  modeButtonText: { fontSize: 13, fontWeight: '700', color: '#333' },
+  modeButtonTextActive: { color: '#fff' },
+  tytLinkBox: { marginTop: 12, backgroundColor: '#FFF7E6', borderRadius: 12, padding: 12 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -373,48 +735,55 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
-  chipActive: {
-    backgroundColor: '#4A6CF7',
-    borderColor: '#4A6CF7',
-  },
-  chipText: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#fff',
-  },
-  addSubjectRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
+  chipActive: { backgroundColor: '#4A6CF7', borderColor: '#4A6CF7' },
+  chipText: { fontSize: 13, color: '#333', fontWeight: '500' },
+  chipTextActive: { color: '#fff' },
+  addSubjectRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 10 },
   addSubjectInput: {
+    flex: 2,
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    borderRadius: 20,
-    paddingHorizontal: 14,
+    borderRadius: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
     backgroundColor: '#fff',
-    minWidth: 120,
   },
-  addSubjectButton: {
-    backgroundColor: '#4A6CF7',
-    paddingHorizontal: 14,
+  addSubjectCountInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
-  },
-  addSubjectButtonText: {
-    color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
+    backgroundColor: '#fff',
   },
-  optionCountRow: {
+  addSubjectButton: { backgroundColor: '#4A6CF7', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
+  addSubjectButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  subjectBlockHeader: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
   },
+  subjectBlockName: { fontSize: 14, fontWeight: '600', color: '#333' },
+  subjectBlockCountRow: { flexDirection: 'row', alignItems: 'center' },
+  subjectBlockCountInput: {
+    width: 50,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 13,
+    textAlign: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  optionCountRow: { flexDirection: 'row', gap: 8 },
   optionCountButton: {
     flex: 1,
     paddingVertical: 10,
@@ -424,18 +793,9 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     alignItems: 'center',
   },
-  optionCountButtonActive: {
-    backgroundColor: '#4A6CF7',
-    borderColor: '#4A6CF7',
-  },
-  optionCountText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-  },
-  optionCountTextActive: {
-    color: '#fff',
-  },
+  optionCountButtonActive: { backgroundColor: '#4A6CF7', borderColor: '#4A6CF7' },
+  optionCountText: { fontSize: 13, fontWeight: '600', color: '#333' },
+  optionCountTextActive: { color: '#fff' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -444,58 +804,44 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
   },
-  answersGrid: {
-    gap: 8,
-  },
-  answerRow: {
+  schoolName: { fontSize: 13, fontWeight: '700', color: '#555', marginBottom: 6 },
+  answersGrid: { gap: 10 },
+  answerBlock: { backgroundColor: '#fff', borderRadius: 12, padding: 10 },
+  answerRow: { flexDirection: 'row', alignItems: 'center' },
+  answerQuestionNo: { fontSize: 14, fontWeight: '700', color: '#333' },
+  answerSubjectLabel: { fontSize: 10, color: '#999' },
+  answerLetters: { flexDirection: 'row', gap: 6, flex: 1 },
+  letterButton: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: '#F5F5F5', alignItems: 'center' },
+  letterButtonActive: { backgroundColor: '#4A6CF7' },
+  letterText: { fontSize: 13, fontWeight: '700', color: '#666' },
+  letterTextActive: { color: '#fff' },
+  outcomeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
-  },
-  answerQuestionNo: {
-    width: 30,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#333',
-  },
-  answerLetters: {
-    flexDirection: 'row',
-    gap: 6,
-    flex: 1,
-  },
-  letterButton: {
-    flex: 1,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    marginTop: 8,
+    backgroundColor: '#F0F4FF',
     borderRadius: 8,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  letterButtonActive: {
-    backgroundColor: '#4A6CF7',
-  },
-  letterText: {
+  outcomeButtonText: { fontSize: 12, color: '#4A6CF7', flex: 1 },
+  outcomeSearchBox: { marginTop: 8, backgroundColor: '#FAFAFA', borderRadius: 8, padding: 8 },
+  outcomeSearchInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     fontSize: 13,
-    fontWeight: '700',
-    color: '#666',
+    backgroundColor: '#fff',
   },
-  letterTextActive: {
-    color: '#fff',
-  },
-  submitButton: {
-    backgroundColor: '#4A6CF7',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  outcomeResultRow: { marginTop: 6, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: '#fff', borderRadius: 6 },
+  outcomeResultCode: { fontSize: 11, fontWeight: '700', color: '#4A6CF7' },
+  outcomeResultText: { fontSize: 12, color: '#333' },
+  outcomeCustomButton: { marginTop: 8, paddingVertical: 8, alignItems: 'center' },
+  outcomeCustomButtonText: { fontSize: 12, color: '#4A6CF7', fontWeight: '600' },
+  submitButton: { backgroundColor: '#4A6CF7', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 28 },
+  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

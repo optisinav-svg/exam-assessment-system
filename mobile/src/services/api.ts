@@ -200,6 +200,48 @@ export async function createSubject(name: string) {
   return data;
 }
 
+export interface LearningOutcome {
+  id: number;
+  subjectId: number;
+  code: string;
+  description: string;
+  gradeLevel: string | null;
+}
+
+export async function searchLearningOutcomes(subjectId: number, query: string, gradeLevel?: string) {
+  const params = new URLSearchParams({ q: query });
+  if (gradeLevel) params.set('gradeLevel', gradeLevel);
+  const { data } = await api.get<LearningOutcome[]>(
+    `/subjects/${subjectId}/learning-outcomes/search?${params.toString()}`
+  );
+  return data;
+}
+
+// ─── Okullar & Sınıflar ─────────────────────────────────────────────────────
+
+export interface School {
+  id: number;
+  name: string;
+  joinCode: string | null;
+}
+
+export interface SchoolClass {
+  id: number;
+  name: string;
+  gradeLevel: string | null;
+  schoolId: number;
+}
+
+export async function getSchools() {
+  const { data } = await api.get<School[]>('/schools');
+  return data;
+}
+
+export async function getClassesBySchool(schoolId: number) {
+  const { data } = await api.get<SchoolClass[]>(`/schools/${schoolId}/classes`);
+  return data;
+}
+
 // ─── Sınavlar ─────────────────────────────────────────────────────────────────
 
 export interface Exam {
@@ -216,6 +258,14 @@ export interface Exam {
   createdAt: string;
 }
 
+export interface ExamQuestionInput {
+  questionNumber: number;
+  subjectId?: number;
+  learningOutcomeId?: number;
+  customOutcomeText?: string;
+  correctAnswer: string;
+}
+
 export interface CreateExamInput {
   title: string;
   subjectId?: number;
@@ -224,6 +274,11 @@ export interface CreateExamInput {
   correctAnswers: Record<string, string>;
   optionCount: 3 | 4 | 5;
   negativeMarking: boolean;
+  examType?: 'TYT' | 'AYT' | 'LGS' | 'custom';
+  relatedExamId?: number;
+  totalScore?: number;
+  classIds?: number[];
+  questions?: ExamQuestionInput[];
 }
 
 export async function getExams() {
