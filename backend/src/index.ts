@@ -18,6 +18,7 @@ import scoreCoefficientsRouter from './routes/score-coefficients.routes';
 import studentAuthRoutes from './routes/student-auth.routes';
 import studentRoutes from './routes/student.routes';
 import subjectRoutes from './routes/subject.routes';
+import learningOutcomesRoutes from './routes/learning-outcomes.routes';
 import { verifyToken } from './middleware/auth.middleware';
 import { seedKazanimlar } from './seed-kazanimlar';
 
@@ -60,6 +61,7 @@ app.use('/api/score-coefficients', verifyToken, scoreCoefficientsRouter); // Pua
 app.use('/api/student-auth', studentAuthRoutes); // Öğrenci kayıt/giriş/e-posta onayı - herkese açık
 app.use('/api/students', verifyToken, studentRoutes); // Öğrenci onay/listeleme - öğretmen girişi gerektirir
 app.use('/api/subjects', verifyToken, subjectRoutes); // Dersler - giriş gerektirir
+app.use('/api/learning-outcomes', verifyToken, learningOutcomesRoutes); // Kazanım yönetimi - giriş gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

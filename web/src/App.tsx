@@ -120,6 +120,7 @@ function AppRoutes() {
         <Route path="/schools" element={<SchoolsPage />} />
         <Route path="/score-coefficients" element={<ScoreCoefficientsPage />} />
         <Route path="/score-calculator" element={<ScoreCalculatorPage />} />
+        <Route path="/outcomes" element={<OutcomesPage />} />
       </Routes>
     </div>
   );
@@ -3101,6 +3102,483 @@ function ScoreCalculatorPage() {
         <p className={`text-xs mt-2 ${textSecondary(theme)}`}>
           Bu hesaplama tahminidir ve gerçekteki ÖSYM puanlama sisteminden farklılık gösterebilir.
           Otomatik sınav okuma tamamlandığında sistem her zaman en güncel yılın katsayılarını kullanacaktır.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Kazanım Yönetimi Sayfası ─────────────────────────────────────────────
+function OutcomesPage() {
+  const { theme } = useTheme();
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [outcomes, setOutcomes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Filtreleme
+  const [gradeLevel, setGradeLevel] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Sayfalama
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalOutcomes, setTotalOutcomes] = useState(0);
+  const pageSize = 50;
+
+  // Yeni kazanım form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newGradeLevel, setNewGradeLevel] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  // Düzenleme
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editGradeLevel, setEditGradeLevel] = useState('');
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+  const authHeaders = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Dersleri yükle
+  useEffect(() => {
+    fetchSubjects();
+  }, []);
+
+  const fetchSubjects = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/learning-outcomes/subjects`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const allSubjects = [...(data.userSubjects || []), ...(data.globalSubjects || [])];
+        setSubjects(allSubjects);
+        if (allSubjects.length > 0 && !selectedSubjectId) {
+          setSelectedSubjectId(allSubjects[0].id);
+        }
+      }
+    } catch (err: any) {
+      console.error('Dersler yüklenemedi:', err);
+    }
+  };
+
+  // Kazanımları yükle
+  const fetchOutcomes = async (subjectId: number, pageNum: number = 1, grade: string = '', query: string = '') => {
+    setLoading(true);
+    setError('');
+    try {
+      let url: string;
+      if (query.length >= 2) {
+        url = `${API_BASE}/learning-outcomes/search/${subjectId}?q=${encodeURIComponent(query)}`;
+        const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (response.ok) {
+          const data = await response.json();
+          setOutcomes(data.outcomes || []);
+          setTotalOutcomes(data.total || 0);
+          setTotalPages(1);
+          setPage(1);
+        }
+      } else {
+        url = `${API_BASE}/learning-outcomes/${subjectId}?page=${pageNum}&pageSize=${pageSize}${grade ? `&gradeLevel=${encodeURIComponent(grade)}` : ''}`;
+        const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (response.ok) {
+          const data = await response.json();
+          setOutcomes(data.outcomes || []);
+          setTotalPages(data.pagination?.totalPages || 1);
+          setTotalOutcomes(data.pagination?.total || 0);
+          setPage(pageNum);
+        }
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Ders seçilince
+  useEffect(() => {
+    if (selectedSubjectId) {
+      setOutcomes([]);
+      setPage(1);
+      setSearchQuery('');
+      fetchOutcomes(selectedSubjectId, 1, gradeLevel);
+    }
+  }, [selectedSubjectId]);
+
+  // Arama (debounce)
+  useEffect(() => {
+    if (selectedSubjectId) {
+      const timer = setTimeout(() => {
+        fetchOutcomes(selectedSubjectId, 1, gradeLevel, searchQuery);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [searchQuery, gradeLevel]);
+
+  // Yeni kazanım ekle
+  const handleAddOutcome = async () => {
+    if (!newCode.trim() || !newDescription.trim()) return;
+    setAdding(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/learning-outcomes/${selectedSubjectId}`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          code: newCode.trim(),
+          description: newDescription.trim(),
+          gradeLevel: newGradeLevel.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess('Kazanım eklendi!');
+        setShowAddForm(false);
+        setNewCode('');
+        setNewDescription('');
+        setNewGradeLevel('');
+        fetchOutcomes(selectedSubjectId!, 1, gradeLevel, searchQuery);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.message || 'Kazanım eklenemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  // Kazanım düzenle
+  const handleUpdateOutcome = async (id: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/learning-outcomes/outcome/${id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({
+          code: editCode,
+          description: editDescription,
+          gradeLevel: editGradeLevel || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess('Kazanım güncellendi!');
+        setEditingId(null);
+        fetchOutcomes(selectedSubjectId!, page, gradeLevel, searchQuery);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.message || 'Kazanım güncellenemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    }
+  };
+
+  // Kazanım sil
+  const handleDeleteOutcome = async (id: number) => {
+    if (!window.confirm('Bu kazanımı silmek istediğinize emin misiniz?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/learning-outcomes/outcome/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        fetchOutcomes(selectedSubjectId!, page, gradeLevel, searchQuery);
+      } else {
+        setError(data.message || 'Kazanım silinemedi');
+      }
+    } catch (err: any) {
+      setError('Bağlantı hatası: ' + err.message);
+    }
+  };
+
+  const gradeLevels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'Mezun'];
+
+  return (
+    <div className={`p-6 max-w-7xl mx-auto transition-colors duration-300`}>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>📚 Kazanım Yönetimi</h1>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}>
+            ← Dashboard
+          </a>
+        </div>
+      </div>
+
+      {/* Hata / Başarı */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          ⚠️ {error}
+          <button onClick={() => setError('')} className="ml-2 font-bold">&times;</button>
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+          ✅ {success}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Sol: Ders Listesi */}
+        <div className={`lg:col-span-1 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} p-4`}>
+          <h3 className={`text-sm font-semibold mb-3 ${textMuted(theme)}`}>📋 Dersler</h3>
+          <div className="space-y-1 max-h-96 overflow-y-auto">
+            {subjects.map(subject => (
+              <button
+                key={subject.id}
+                onClick={() => setSelectedSubjectId(subject.id)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  selectedSubjectId === subject.id
+                    ? 'bg-blue-600 text-white'
+                    : `${textPrimary(theme)} hover:bg-blue-50 dark:hover:bg-gray-700`
+                }`}
+              >
+                {subject.name} {subject.code ? `(${subject.code})` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sağ: Kazanım Listesi */}
+        <div className="lg:col-span-3">
+          {/* Filtreler */}
+          <div className={`rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} p-4 mb-4`}>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className={`block text-xs font-medium mb-1 ${textMuted(theme)}`}>🔍 Arama</label>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Kazanım kodu veya açıklama ara..."
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                />
+              </div>
+              <div className="w-32">
+                <label className={`block text-xs font-medium mb-1 ${textMuted(theme)}`}>Sınıf Seviyesi</label>
+                <select
+                  value={gradeLevel}
+                  onChange={(e) => setGradeLevel(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+                >
+                  <option value="">Tümü</option>
+                  {gradeLevels.map(g => (
+                    <option key={g} value={g}>{g}. Sınıf {g === 'Mezun' ? '' : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+              >
+                + Yeni Kazanım
+              </button>
+            </div>
+            <p className={`text-xs mt-2 ${textSecondary(theme)}`}>
+              {totalOutcomes} kazanım listeleniyor
+            </p>
+          </div>
+
+          {/* Yeni Kazanım Formu */}
+          {showAddForm && (
+            <div className={`p-4 rounded-xl mb-4 border ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-200'}`}>
+              <h4 className={`text-sm font-semibold mb-3 ${textPrimary(theme)}`}>Yeni Kazanım Ekle</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value)}
+                  placeholder="Kazanım kodu *"
+                  className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                />
+                <input
+                  type="text"
+                  value={newGradeLevel}
+                  onChange={(e) => setNewGradeLevel(e.target.value)}
+                  placeholder="Sınıf seviyesi (örn: 8, Mezun)"
+                  className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                />
+                <input
+                  type="text"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Açıklama *"
+                  className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${inputBg(theme)}`}
+                />
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={handleAddOutcome}
+                  disabled={adding || !newCode.trim() || !newDescription.trim()}
+                  className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
+                >
+                  {adding ? '🔄' : '✅ Ekle'}
+                </button>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className={`px-4 py-1.5 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Kazanım Tablosu */}
+          <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+            {loading ? (
+              <div className="p-8 text-center"><p className={textSecondary(theme)}>Yükleniyor...</p></div>
+            ) : outcomes.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className={textSecondary(theme)}>Kazanım bulunamadı</p>
+                <p className={`text-xs mt-1 ${textMuted(theme)}`}>Arama kriterlerini değiştirin veya yeni kazanım ekleyin</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}>
+                      <tr>
+                        <th className={`px-4 py-2 text-left text-xs font-semibold ${textPrimary(theme)}`}>Kod</th>
+                        <th className={`px-4 py-2 text-left text-xs font-semibold ${textPrimary(theme)}`}>Açıklama</th>
+                        <th className={`px-4 py-2 text-center text-xs font-semibold ${textPrimary(theme)}`}>Sınıf</th>
+                        <th className={`px-4 py-2 text-right text-xs font-semibold ${textPrimary(theme)}`}>İşlem</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${borderColor2(theme)}`}>
+                      {outcomes.map(outcome => (
+                        <tr key={outcome.id} className={theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                          <td className={`px-4 py-2 font-mono text-xs ${textPrimary(theme)}`}>
+                            {editingId === outcome.id ? (
+                              <input
+                                type="text"
+                                value={editCode}
+                                onChange={(e) => setEditCode(e.target.value)}
+                                className={`w-24 px-2 py-1 border rounded text-xs ${inputBg(theme)}`}
+                              />
+                            ) : (
+                              outcome.code
+                            )}
+                          </td>
+                          <td className={`px-4 py-2 text-xs ${textPrimary(theme)}`}>
+                            {editingId === outcome.id ? (
+                              <input
+                                type="text"
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                className={`w-full px-2 py-1 border rounded text-xs ${inputBg(theme)}`}
+                              />
+                            ) : (
+                              outcome.description
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            {editingId === outcome.id ? (
+                              <input
+                                type="text"
+                                value={editGradeLevel}
+                                onChange={(e) => setEditGradeLevel(e.target.value)}
+                                placeholder="Sınıf"
+                                className={`w-16 px-2 py-1 border rounded text-xs text-center ${inputBg(theme)}`}
+                              />
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded-full text-xs ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-blue-100 text-blue-700'}`}>
+                                {outcome.gradeLevel || '—'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            {editingId === outcome.id ? (
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  onClick={() => handleUpdateOutcome(outcome.id)}
+                                  className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
+                                >
+                                  💾
+                                </button>
+                                <button
+                                  onClick={() => setEditingId(null)}
+                                  className={`px-2 py-0.5 rounded text-xs ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  onClick={() => {
+                                    setEditingId(outcome.id);
+                                    setEditCode(outcome.code);
+                                    setEditDescription(outcome.description);
+                                    setEditGradeLevel(outcome.gradeLevel || '');
+                                  }}
+                                  className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteOutcome(outcome.id)}
+                                  className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Sayfalama */}
+                {totalPages > 1 && searchQuery.length < 2 && (
+                  <div className={`p-4 border-t ${borderColor2(theme)} flex items-center justify-between`}>
+                    <span className={`text-xs ${textSecondary(theme)}`}>
+                      Sayfa {page} / {totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => fetchOutcomes(selectedSubjectId!, page - 1, gradeLevel, searchQuery)}
+                        disabled={page <= 1}
+                        className="px-3 py-1 rounded text-xs border disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ← Önceki
+                      </button>
+                      <button
+                        onClick={() => fetchOutcomes(selectedSubjectId!, page + 1, gradeLevel, searchQuery)}
+                        disabled={page >= totalPages}
+                        className="px-3 py-1 rounded text-xs border disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Sonraki →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bilgi */}
+      <div className={`mt-6 p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+        <h3 className={`text-sm font-semibold mb-2 ${textMuted(theme)}`}>💡 Bilgi</h3>
+        <p className={`text-sm ${textSecondary(theme)}`}>
+          Bu ekranda sisteme aktarılan 10.715 kazanımı (17 ders) derse göre gözden geçirebilir,
+          arama yapabilir, sınıf seviyesine göre filtreleyebilir, düzenleyebilir veya yeni kazanım ekleyebilirsiniz.
+          Sayfalama sayesinde binlerce kazanım sorunsuz görüntülenebilir.
         </p>
       </div>
     </div>
