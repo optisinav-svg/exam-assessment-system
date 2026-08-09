@@ -38,6 +38,11 @@ export default function RegisterScreen({ navigation }: any) {
     }
     try {
       await register(email.trim(), password, fullName.trim());
+      Alert.alert(
+        'Kayıt başarılı',
+        'E-posta adresinize gönderilen bağlantıyla hesabınızı onaylayın, ardından giriş yapabilirsiniz.',
+        [{ text: 'Tamam', onPress: () => navigation.navigate('Login') }]
+      );
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||

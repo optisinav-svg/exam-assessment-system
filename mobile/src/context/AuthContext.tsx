@@ -49,10 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (email: string, password: string, fullName: string) => {
     setIsSubmitting(true);
     try {
-      const data = await registerRequest(email, password, fullName);
-      await saveToken(data.token);
-      await saveUser(data.user);
-      setUser(data.user);
+      // Artık kayıt sonrası otomatik giriş yapılmıyor — e-posta onayı gerekiyor.
+      await registerRequest(email, password, fullName);
     } finally {
       setIsSubmitting(false);
     }

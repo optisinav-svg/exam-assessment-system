@@ -106,7 +106,7 @@ router.post('/register', async (req: Request, res: Response) => {
         joinMethod: 'code',
       });
 
-      const baseUrl = process.env.API_BASE_URL || 'http://localhost:5000';
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const verifyUrl = `${baseUrl}/api/student-auth/verify-email/${verificationToken}`;
       await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(fullName, verifyUrl));
 
@@ -143,7 +143,7 @@ router.post('/register', async (req: Request, res: Response) => {
     }).returning();
 
     // E-posta onay bağlantısı gönder
-    const baseUrl = process.env.API_BASE_URL || 'http://localhost:5000';
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verifyUrl = `${baseUrl}/api/student-auth/verify-email/${verificationToken}`;
     await sendEmail(
       email,

@@ -20,6 +20,8 @@ export const users = pgTable('users', {
   fullName: varchar('full_name', { length: 255 }).notNull(),
   role: varchar('role', { length: 50 }).default('teacher'),
   profileImage: text('profile_image'),
+  isEmailVerified: boolean('is_email_verified').default(true), // mevcut hesaplar etkilenmesin diye varsayılan true; yeni kayıtlar kodda elle false yapılıyor
+  emailVerificationToken: varchar('email_verification_token', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

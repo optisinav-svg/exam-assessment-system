@@ -91,12 +91,10 @@ export async function loginRequest(email: string, password: string, role: UserRo
 }
 
 export async function registerRequest(email: string, password: string, fullName: string) {
-  const { data } = await api.post<{ token: string; user: AuthUser }>('/auth/register', {
-    email,
-    password,
-    fullName,
-    role: 'teacher',
-  });
+  const { data } = await api.post<{ message: string; requiresEmailVerification: boolean }>(
+    '/auth/register',
+    { email, password, fullName, role: 'teacher' }
+  );
   return data;
 }
 
@@ -209,10 +207,10 @@ export interface LearningOutcome {
 }
 
 export async function searchLearningOutcomes(subjectId: number, query: string, gradeLevel?: string) {
-  const params = new URLSearchParams({ q: query });
-  if (gradeLevel) params.set('gradeLevel', gradeLevel);
+  let qs = `q=${encodeURIComponent(query)}`;
+  if (gradeLevel) qs += `&gradeLevel=${encodeURIComponent(gradeLevel)}`;
   const { data } = await api.get<LearningOutcome[]>(
-    `/subjects/${subjectId}/learning-outcomes/search?${params.toString()}`
+    `/subjects/${subjectId}/learning-outcomes/search?${qs}`
   );
   return data;
 }

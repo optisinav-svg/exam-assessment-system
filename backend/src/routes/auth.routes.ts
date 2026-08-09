@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { db } from '../index';
 import { users } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { sendEmail, verificationEmailHtml } from '../utils/email';
 
 const router = Router();
 
@@ -20,34 +22,50 @@ router.post('/register', async (req: Request, res: Response) => {
 
     // Şifre hashle
     const hashedPassword = await bcrypt.hash(password, 10);
+    const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    // Kullanıcı oluştur
+    // Kullanıcı oluştur (e-posta onaylanana kadar isEmailVerified: false)
     const [newUser] = await db.insert(users).values({
       email,
       password: hashedPassword,
       fullName,
       role: role || 'teacher',
+      isEmailVerified: false,
+      emailVerificationToken: verificationToken,
       createdAt: new Date(),
     }).returning();
 
-    // Token oluştur
-    const token = jwt.sign(
-      { id: newUser.id, email: newUser.email, role: newUser.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
-    );
+    // Onay e-postası gönder
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const verifyUrl = `${baseUrl}/api/auth/verify-email/${verificationToken}`;
+    await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(fullName, verifyUrl));
 
     res.status(201).json({
-      token,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        fullName: newUser.fullName,
-        role: newUser.role,
-      },
+      message: 'Kayıt başarılı. Lütfen e-postanıza gönderilen bağlantıyla hesabınızı onaylayın.',
+      requiresEmailVerification: true,
     });
   } catch (error) {
     res.status(500).json({ message: 'Kayıt olurken hata oluştu', error });
+  }
+});
+
+// ─── GET /api/auth/verify-email/:token ────────────────────────────────────
+router.get('/verify-email/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const [user] = await db.select().from(users).where(eq(users.emailVerificationToken, token));
+
+    if (!user) {
+      return res.status(400).send('<h2>Geçersiz veya süresi dolmuş onay bağlantısı.</h2>');
+    }
+
+    await db.update(users)
+      .set({ isEmailVerified: true, emailVerificationToken: null })
+      .where(eq(users.id, user.id));
+
+    res.send('<h2>E-posta adresiniz onaylandı! Artık uygulamaya giriş yapabilirsiniz.</h2>');
+  } catch (error) {
+    res.status(500).send('<h2>Onay sırasında bir hata oluştu.</h2>');
   }
 });
 
@@ -64,6 +82,13 @@ router.post('/login', async (req: Request, res: Response) => {
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return res.status(401).json({ message: 'Email veya şifre hatalı' });
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        message: 'E-posta adresiniz henüz onaylanmamış. Lütfen e-postanızı kontrol edin.',
+        requiresEmailVerification: true,
+      });
     }
 
     const token = jwt.sign(
