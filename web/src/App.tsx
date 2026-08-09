@@ -4455,7 +4455,7 @@ function PricingPage() {
                 }`}
                 onClick={() => {
                   if (plan.cta === 'Bize Ulaşın') {
-                    window.location.href = 'mailto:info@optiksinav.com';
+                    window.location.href = 'mailto:optisinav@gmail.com';
                   } else {
                     window.location.href = '/login';
                   }
