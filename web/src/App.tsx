@@ -123,6 +123,7 @@ function AppRoutes() {
         <Route path="/outcomes" element={<OutcomesPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/storage" element={<StoragePage />} />
+        <Route path="/pricing" element={<PricingPage />} />
       </Routes>
     </div>
   );
@@ -4298,6 +4299,187 @@ function StoragePage() {
           💡 Yüklenen dosyalar sunucuda güvenli bir şekilde saklanır. Farklı cihazlardan giriş yaptığınızda
           aynı hesapla tüm dosyalarınıza erişebilirsiniz.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fiyatlandırma Sayfası (Public) ─────────────────────────────────────────
+function PricingPage() {
+  const { theme } = useTheme();
+
+  const plans = [
+    {
+      id: 'ogrenci',
+      icon: '🎓',
+      title: 'Öğrenci',
+      price: '49 - 79 TL',
+      period: '/ay',
+      note: 'Lansman fiyatı, yakında netleşecek',
+      features: [
+        'Sınav sonuçları görüntüleme',
+        'Kazanım takibi',
+        'TYT/AYT/LGS puan hesaplama',
+        'Hedeflerim & ödev takibi',
+      ],
+      highlighted: false,
+      cta: 'Bilgi Al',
+    },
+    {
+      id: 'ogretmen',
+      icon: '👩‍🏫',
+      title: 'Öğretmen',
+      price: '99 - 199 TL',
+      period: '/ay',
+      note: 'Lansman fiyatı, yakında netleşecek',
+      features: [
+        'Sınırsız sınav oluşturma',
+        'Sınıf & öğrenci yönetimi',
+        'Kazanım bazlı analiz',
+        'Puan hesaplama',
+        'Rapor çıktıları (PDF/Excel)',
+      ],
+      highlighted: true,
+      cta: 'Bilgi Al',
+    },
+    {
+      id: 'kurum',
+      icon: '🏫',
+      title: 'Kurum (Okul/Kurs)',
+      price: '10 - 20 TL',
+      period: '/öğrenci/ay',
+      note: 'Kurum büyüklüğüne göre kademeli',
+      features: [
+        'Tüm öğretmen özellikleri',
+        'Çoklu sınıf/şube yönetimi',
+        'Kurum geneli raporlama',
+        'Öğretmen hesabı yönetimi',
+      ],
+      highlighted: false,
+      cta: 'Bize Ulaşın',
+    },
+    {
+      id: 'koc',
+      icon: '🎯',
+      title: 'Eğitim Koçu',
+      price: '15 - 25 TL',
+      period: '/öğrenci/ay',
+      note: 'Takip edilen öğrenci sayısına göre',
+      features: [
+        'Öğrenci gelişim takibi',
+        'Kazanım bazlı koçluk',
+        'İlerleme raporları',
+        'Mesajlaşma desteği',
+      ],
+      highlighted: false,
+      cta: 'Bize Ulaşın',
+    },
+  ];
+
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${bgPrimary(theme)}`}>
+      {/* Header */}
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="text-center mb-10">
+          <h1 className={`text-4xl font-bold mb-3 ${textPrimary(theme)}`}>
+            💰 Fiyatlandırma
+          </h1>
+          <p className={`text-lg ${textSecondary(theme)} max-w-2xl mx-auto`}>
+            OptikSınav ile optik form okuma, kazanım analizi ve sınıf yönetimini
+            basitleştirin. Herkes için uygun bir plan var.
+          </p>
+        </div>
+
+        {/* Ücretsiz Deneme Banner */}
+        <div className={`text-center mb-10 p-4 rounded-xl ${
+          theme === 'dark' ? 'bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30' : 'bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200'
+        }`}>
+          <p className={`text-lg font-bold ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+            🎉 İlk 1 ay tüm özellikler ücretsiz!
+          </p>
+          <p className={`text-sm mt-1 ${textMuted(theme)}`}>
+            Kredi kartı gerekmez, istediğiniz zaman iptal edebilirsiniz.
+          </p>
+        </div>
+
+        {/* Plan Kartları */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          {plans.map((plan) => (
+            <div
+              key={plan.id}
+              className={`relative rounded-2xl p-6 flex flex-col transition-all hover:scale-[1.02] ${
+                plan.highlighted
+                  ? theme === 'dark'
+                    ? 'bg-gradient-to-b from-blue-900/60 to-gray-800 border-2 border-blue-500 shadow-lg shadow-blue-500/20'
+                    : 'bg-gradient-to-b from-blue-50 to-white border-2 border-blue-400 shadow-lg shadow-blue-200/50'
+                  : `${bgCard(theme)} border ${borderColor(theme)} shadow-sm`
+              }`}
+            >
+              {plan.highlighted && (
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold ${
+                  theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                }`}>
+                  ⭐ En Popüler
+                </div>
+              )}
+
+              <div className="text-center mb-4">
+                <span className="text-4xl block mb-2">{plan.icon}</span>
+                <h3 className={`text-xl font-bold ${textPrimary(theme)}`}>{plan.title}</h3>
+              </div>
+
+              <div className="text-center mb-3">
+                <span className={`text-3xl font-bold ${plan.highlighted ? (theme === 'dark' ? 'text-blue-300' : 'text-blue-600') : textPrimary(theme)}`}>
+                  {plan.price}
+                </span>
+                <span className={`text-sm ${textSecondary(theme)}`}>{plan.period}</span>
+                <p className={`text-xs mt-1 ${textMuted(theme)}`}>
+                  💡 {plan.note}
+                </p>
+              </div>
+
+              <div className={`flex-1 border-t pt-4 mb-4 space-y-2 ${borderColor2(theme)}`}>
+                {plan.features.map((feature, i) => (
+                  <div key={i} className={`flex items-start gap-2 text-sm ${textSecondary(theme)}`}>
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className={`w-full py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                  plan.highlighted
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : `${bgCard(theme)} ${textPrimary(theme)} border ${borderColor(theme)} hover:opacity-80`
+                }`}
+                onClick={() => {
+                  if (plan.cta === 'Bize Ulaşın') {
+                    window.location.href = 'mailto:info@optiksinav.com';
+                  } else {
+                    window.location.href = '/login';
+                  }
+                }}
+              >
+                {plan.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Alt Not */}
+        <div className={`text-center p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800/50' : 'bg-gray-50'}`}>
+          <p className={`text-xs ${textMuted(theme)}`}>
+            ℹ️ Fiyatlar lansman dönemi içindir, ileride güncellenebilir. Gerçek ödeme altyapısı yakında eklenecektir.
+          </p>
+        </div>
+
+        {/* Geri Dön */}
+        <div className="text-center mt-6">
+          <a href="/" className={`text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}>
+            ← Ana Sayfaya Dön
+          </a>
+        </div>
       </div>
     </div>
   );
