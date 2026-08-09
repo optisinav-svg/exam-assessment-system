@@ -1827,6 +1827,14 @@ function SchoolsPage() {
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentSuccess, setStudentSuccess] = useState(false);
 
+  // OCR Import State
+  const [showOcrImport, setShowOcrImport] = useState<number | null>(null);
+  const [ocrDetectedNames, setOcrDetectedNames] = useState<string[]>([]);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrSuccess, setOcrSuccess] = useState('');
+  const [ocrError, setOcrError] = useState('');
+  const [ocrProgress, setOcrProgress] = useState(0);
+
   // Öğrencileri yükle
   const fetchStudents = async (classId: number) => {
     try {
@@ -1840,6 +1848,79 @@ function SchoolsPage() {
     } catch (err: any) {
       console.error('Öğrenciler yüklenemedi:', err);
     }
+  };
+
+  // OCR Import — Fotoğraftan isimleri oku
+  const handleOcrImport = async (classId: number, fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setOcrLoading(true);
+    setOcrError('');
+    setOcrSuccess('');
+    setOcrDetectedNames([]);
+    setOcrProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', fileList[0]);
+
+      const response = await fetch(`${API_BASE}/roster/classes/${classId}/import-photo`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setOcrDetectedNames(data.detectedNames || []);
+        setOcrSuccess(data.message || `OCR tamamlandı`);
+        setOcrProgress(100);
+      } else {
+        setOcrError(data.message || 'OCR işlemi başarısız oldu');
+      }
+    } catch (err: any) {
+      setOcrError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // OCR Onay — Tespit edilen isimleri ekle
+  const handleOcrConfirm = async (classId: number) => {
+    if (ocrDetectedNames.length === 0) return;
+    setOcrLoading(true);
+    setOcrError('');
+    try {
+      const response = await fetch(`${API_BASE}/roster/classes/${classId}/import-confirm`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ names: ocrDetectedNames }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setOcrSuccess(data.message || `${ocrDetectedNames.length} öğrenci eklendi`);
+        setShowOcrImport(null);
+        setOcrDetectedNames([]);
+        fetchStudents(classId);
+        setTimeout(() => setOcrSuccess(''), 5000);
+      } else {
+        setOcrError(data.message || 'İsimler eklenemedi');
+      }
+    } catch (err: any) {
+      setOcrError('Bağlantı hatası: ' + err.message);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // OCR isimlerinden birini sil
+  const handleOcrRemoveName = (index: number) => {
+    setOcrDetectedNames(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // OCR isimlerinden birini düzenle
+  const handleOcrEditName = (index: number, newName: string) => {
+    setOcrDetectedNames(prev => prev.map((n, i) => i === index ? newName : n));
   };
 
   // Öğrenci ekleme
@@ -2276,12 +2357,123 @@ function SchoolsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <button
-                                  onClick={() => setShowAddStudent(cls.id)}
-                                  className="mb-3 px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
-                                >
-                                  + Öğrenci Ekle
-                                </button>
+                                <div className="flex gap-2 mb-3 flex-wrap">
+                                  <button
+                                    onClick={() => setShowAddStudent(cls.id)}
+                                    className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                                  >
+                                    + Öğrenci Ekle
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowOcrImport(showOcrImport === cls.id ? null : cls.id);
+                                      setOcrDetectedNames([]);
+                                      setOcrSuccess('');
+                                      setOcrError('');
+                                    }}
+                                    className="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
+                                  >
+                                    📷 Fotoğraftan Listeyi Al
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* OCR Import Bölümü */}
+                              {showOcrImport === cls.id && (
+                                <div className={`p-3 rounded-lg mb-3 ${theme === 'dark' ? 'bg-gray-600' : 'bg-purple-50'}`}>
+                                  <h5 className={`text-sm font-medium mb-2 ${textMuted(theme)}`}>📷 Fotoğraftan Öğrenci Listesi İçe Aktar</h5>
+                                  
+                                  {ocrSuccess && (
+                                    <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
+                                      ✅ {ocrSuccess}
+                                    </div>
+                                  )}
+                                  {ocrError && (
+                                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                                      ⚠️ {ocrError}
+                                      <button onClick={() => setOcrError('')} className="ml-2 font-bold">&times;</button>
+                                    </div>
+                                  )}
+
+                                  <div className="mb-3">
+                                    <label className={`block text-xs mb-1 ${textMuted(theme)}`}>
+                                      Sınıf listesinin fotoğrafını (jpg/png) veya metin katmanlı PDF'ini yükleyin
+                                    </label>
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/png,image/jpg,.pdf"
+                                      onChange={(e) => handleOcrImport(cls.id, e.target.files)}
+                                      disabled={ocrLoading}
+                                      className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg(theme)}`}
+                                    />
+                                    <p className={`text-xs mt-1 ${textMuted(theme)}`}>
+                                      💡 Not: OCR bilgisayar yazısı listelerde iyi çalışır. El yazısı listelerde düşük başarı beklenir. Tespit edilen isimleri onaylamadan önce kontrol edin.
+                                    </p>
+                                  </div>
+
+                                  {ocrLoading && !ocrDetectedNames.length && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <span className="animate-spin">⏳</span>
+                                      <span className={textSecondary(theme)}>OCR işlemi yapılıyor... (birkaç saniye)</span>
+                                    </div>
+                                  )}
+
+                                  {/* Tespit Edilen İsimler */}
+                                  {ocrDetectedNames.length > 0 && (
+                                    <div className="mt-3">
+                                      <div className={`flex items-center justify-between mb-2 px-2 py-1 rounded text-xs font-semibold ${
+                                        theme === 'dark' ? 'bg-gray-500 text-gray-300' : 'bg-gray-200 text-gray-600'
+                                      }`}>
+                                        <span>📋 Tespit Edilen İsimler ({ocrDetectedNames.length})</span>
+                                        <span className={textMuted(theme)}>Düzenleyebilir veya silebilirsiniz</span>
+                                      </div>
+                                      <div className={`max-h-48 overflow-y-auto rounded border ${borderColor2(theme)} ${bgCard(theme)}`}>
+                                        {ocrDetectedNames.map((name, index) => (
+                                          <div
+                                            key={index}
+                                            className={`flex items-center gap-2 px-3 py-1.5 text-sm ${
+                                              theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-50'
+                                            }`}
+                                          >
+                                            <input
+                                              type="text"
+                                              value={name}
+                                              onChange={(e) => handleOcrEditName(index, e.target.value)}
+                                              className={`flex-1 px-2 py-1 border rounded text-sm ${inputBg(theme)}`}
+                                            />
+                                            <button
+                                              onClick={() => handleOcrRemoveName(index)}
+                                              className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200"
+                                              title="Satırı Sil"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="flex gap-2 mt-3">
+                                        <button
+                                          onClick={() => handleOcrConfirm(cls.id)}
+                                          disabled={ocrLoading || ocrDetectedNames.length === 0}
+                                          className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                          {ocrLoading ? '🔄 Ekleniyor...' : `✅ Onayla ve Ekle (${ocrDetectedNames.length})`}
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setShowOcrImport(null);
+                                            setOcrDetectedNames([]);
+                                            setOcrSuccess('');
+                                            setOcrError('');
+                                          }}
+                                          className={`px-4 py-1.5 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)}`}
+                                        >
+                                          Kapat
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               )}
 
                               {/* Öğrenci Listesi */}
