@@ -2,6 +2,22 @@ import express from 'express';
 import { eq, and } from 'drizzle-orm';
 import { students, classes, schools, studentEnrollments } from '../../../shared/schema';
 import { db } from '../index';
+import multer from 'multer';
+import path from 'path';
+import os from 'os';
+import { createWorker } from 'tesseract.js';
+
+// Multer konfigürasyonu (geçici dosya saklama)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(os.tmpdir(), 'ocr-uploads'));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
 const router = express.Router();
 
@@ -61,14 +77,6 @@ router.post('/students', async (req: any, res: express.Response) => {
         isActive: true,
       })
       .returning();
-
-    await db.insert(studentEnrollments).values({
-      studentId: newStudent.id,
-      classId: parseInt(classId),
-      teacherId,
-      status: 'active',
-      joinMethod: 'roster',
-    });
 
     res.status(201).json({
       success: true,
@@ -208,6 +216,223 @@ router.delete('/students/:id', async (req: any, res: express.Response) => {
   }
 });
 
+// POST /api/roster/classes/:classId/import-photo — Fotoğraf/PDF'den OCR ile isim oku
+router.post('/classes/:classId/import-photo', upload.single('file'), async (req: any, res: express.Response) => {
+  try {
+    const teacherId = req.user?.id;
+    const classId = parseInt(req.params.classId);
+
+    if (!teacherId) {
+      return res.status(401).json({ message: 'Kimlik doğrulama gerekli' });
+    }
+
+    // Sınıf yetki kontrolü
+    const cls = await db
+      .select({ classId: classes.id, schoolId: classes.schoolId })
+      .from(classes)
+      .where(eq(classes.id, classId));
+
+    if (cls.length === 0) {
+      return res.status(404).json({ message: 'Sınıf bulunamadı' });
+    }
+    const clsSchoolId = cls[0].schoolId;
+    if (clsSchoolId === null) {
+      return res.status(404).json({ message: 'Sınıfın bağlı olduğu okul bulunamadı' });
+    }
+
+    const school = await db
+      .select({ teacherId: schools.teacherId })
+      .from(schools)
+      .where(eq(schools.id, clsSchoolId));
+
+    if (school.length === 0 || school[0].teacherId !== teacherId) {
+      return res.status(403).json({ message: 'Bu sınıfa erişim yetkiniz yok' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Dosya gerekli' });
+    }
+
+    const filePath = req.file.path;
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+
+    // PDF mi kontrol et
+    let imagePath = filePath;
+    if (fileExt === '.pdf') {
+      // PDF'den ilk sayfayı görsel olarak çıkar (basit yaklaşım)
+      // tesseract.js PDF'i doğrudan desteklemez, pdf'ten sadece metin katmanı varsa okunabilir
+      // En yaygın kullanım fotoğraf (jpg/png) olacağı için PDF'yi basit metin çıkarmayla dene
+      const pdfText = await extractPdfText(filePath);
+      if (pdfText) {
+        const detectedNames = parseNamesFromText(pdfText);
+        return res.json({
+          success: true,
+          detectedNames,
+          message: 'PDF metin katmanından isimler çıkarıldı',
+        });
+      } else {
+        // PDF'de metin katmanı yoksa, fotoğrafa dönüştürülebilir
+        return res.status(400).json({
+          message: 'Bu PDF metin katmanı içermez. Lütfen listeden doğrudan bir fotoğraf (jpg/png) yükleyin.',
+        });
+      }
+    }
+
+    // Fotoğraf: Tesseract.js ile OCR
+    const worker = await createWorker('tur+eng');
+    const { data: { text } } = await worker.recognize(imagePath);
+    await worker.terminate();
+
+    const detectedNames = parseNamesFromText(text);
+
+    // Geçici dosyayı sil
+    try { require('fs').unlinkSync(imagePath); } catch (e) { /* */ }
+
+    res.json({
+      success: true,
+      detectedNames,
+      message: `OCR tamamlandı, ${detectedNames.length} isim tespit edildi`,
+    });
+  } catch (error) {
+    console.error('OCR import hatası:', error);
+    res.status(500).json({ message: 'OCR işlemi sırasında hata oluştu' });
+  }
+});
+
+// POST /api/roster/classes/:classId/import-confirm — OCR ile tespit edilen isimleri toplu ekle
+router.post('/classes/:classId/import-confirm', async (req: any, res: express.Response) => {
+  try {
+    const teacherId = req.user?.id;
+    const classId = parseInt(req.params.classId);
+
+    if (!teacherId) {
+      return res.status(401).json({ message: 'Kimlik doğrulama gerekli' });
+    }
+
+    const { names } = req.body;
+
+    if (!names || !Array.isArray(names) || names.length === 0) {
+      return res.status(400).json({ message: 'names dizisi gerekli' });
+    }
+
+    // Sınıf yetki kontrolü
+    const cls = await db
+      .select({ classId: classes.id, schoolId: classes.schoolId })
+      .from(classes)
+      .where(eq(classes.id, classId));
+
+    if (cls.length === 0) {
+      return res.status(404).json({ message: 'Sınıf bulunamadı' });
+    }
+    const clsSchoolId = cls[0].schoolId;
+    if (clsSchoolId === null) {
+      return res.status(404).json({ message: 'Sınıfın bağlı olduğu okul bulunamadı' });
+    }
+
+    const school = await db
+      .select({ teacherId: schools.teacherId })
+      .from(schools)
+      .where(eq(schools.id, clsSchoolId));
+
+    if (school.length === 0 || school[0].teacherId !== teacherId) {
+      return res.status(403).json({ message: 'Bu sınıfa erişim yetkiniz yok' });
+    }
+
+    // Toplu ekle
+    const addedStudents = [];
+    for (const nameStr of names) {
+      if (!nameStr?.trim()) continue;
+
+      // "Ad Soyad" formatından ayır
+      const parts = nameStr.trim().split(/\s+/);
+      const firstName = parts[0] || '';
+      const lastName = parts.slice(1).join(' ') || '';
+
+      if (!firstName || !lastName) {
+        // Tek kelime varsa, hepini firstName yap
+        addedStudents.push({ name: nameStr.trim(), error: 'Tek kelime — Ad Soyad olarak ayırlamadı' });
+        continue;
+      }
+
+      const [newStudent] = await db
+        .insert(students)
+        .values({
+          classId,
+          teacherId,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          studentNo: null,
+          parentPhone: null,
+          isApproved: true,
+          isEmailVerified: true,
+          email: null,
+          password: null,
+          isActive: true,
+        })
+        .returning();
+
+      addedStudents.push({ name: nameStr.trim(), studentId: newStudent.id, error: null });
+    }
+
+    res.json({
+      success: true,
+      message: `${addedStudents.filter(s => !s.error).length} öğrenci eklendi`,
+      results: addedStudents,
+    });
+  } catch (error) {
+    console.error('Import confirm hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// PDF'den metin çıkar (pdfjs-lite yerine basit regex yaklaşımı)
+async function extractPdfText(filePath: string): Promise<string> {
+  try {
+    // pdf-parse veya benzeri bir kütüphane kullan
+    // Eğer yoksa, PDF'in metin katmanı var mı kontrol et
+    const fs = require('fs');
+    const buffer = fs.readFileSync(filePath);
+    const text = buffer.toString('latin1');
+    
+    // PDF'de metin akışı var mı?
+    const textStream = text.match(/\(([^)]{3,})\)\s*Tj/g);
+    if (textStream && textStream.length > 3) {
+      return textStream.map((t: string) => t.replace(/\(.*?\)\s*Tj/, (_: string, g: string) => g)).join('\n');
+    }
+    return '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// OCR metninden isim listesi çıkar
+function parseNamesFromText(text: string): string[] {
+  const lines = text.split('\n');
+  const names: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Satırda sayı varsa atla (numara, tarih, vs.)
+    if (/\d/.test(trimmed)) continue;
+
+    // 2+ kelime olmalı
+    const words = trimmed.split(/\s+/).filter(w => w.length > 0);
+    if (words.length < 2) continue;
+
+    // Çok uzun satırları atla (başlık, adres vs.)
+    if (trimmed.length > 50) continue;
+
+    // Her kelime en az 2 karakter olmalı (Türkçe isimler)
+    if (words.some(w => w.length < 2)) continue;
+
+    names.push(trimmed);
+  }
+
+  return [...new Set(names)]; // Tekrar edenleri temizle
+}
+
 // PUT /api/roster/students/:id/transfer — Öğrenciyi başka bir sınıfa geçir
 // (geçmiş kaybolmaz: eski kayıt "transferred" olarak kapanır, yenisi açılır)
 router.put('/students/:id/transfer', async (req: any, res: express.Response) => {
@@ -311,5 +536,6 @@ router.get('/students/:id/history', async (req: any, res: express.Response) => {
     res.status(500).json({ message: 'Sunucu hatası' });
   }
 });
+
 
 export default router;
