@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, createContext, useContext } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -151,20 +151,73 @@ function HomePage() {
 // Giriş Sayfası
 function LoginPage() {
   const { theme } = useTheme();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!email.trim() || !password) {
+      setError('Lütfen e-posta ve şifrenizi girin.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.message || 'Giriş yapılamadı.');
+        return;
+      }
+      localStorage.setItem('optiksinav-token', data.token);
+      localStorage.setItem('optiksinav-user', JSON.stringify(data.user));
+      navigate('/');
+      window.location.reload(); // header/menü gibi token'a bağlı alanların güncellenmesi için
+    } catch (err) {
+      setError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className={`max-w-md mx-auto mt-20 p-6 rounded-lg shadow-md ${bgCard(theme)}`}>
       <h2 className={`text-2xl font-bold text-center mb-6 ${textPrimary(theme)}`}>Giriş Yap</h2>
-      <form>
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-700 text-sm">{error}</div>
+      )}
+      <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className={`block mb-2 ${textMuted(theme)}`}>Email</label>
-          <input type="email" className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+          />
         </div>
         <div className="mb-6">
           <label className={`block mb-2 ${textMuted(theme)}`}>Şifre</label>
-          <input type="password" className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`} />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+          />
         </div>
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-          Giriş Yap
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+        >
+          {isSubmitting ? 'Giriş yapılıyor...' : 'Giriş Yap'}
         </button>
       </form>
       <p className={`text-center mt-4 text-sm ${textMuted(theme)}`}>
@@ -177,24 +230,92 @@ function LoginPage() {
 // Kayıt Sayfası
 function RegisterPage() {
   const { theme } = useTheme();
+  const navigate = useNavigate();
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    if (!fullName.trim() || !email.trim() || !password) {
+      setError('Lütfen tüm alanları doldurun.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Şifre en az 6 karakter olmalıdır.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password, fullName: fullName.trim(), role: 'teacher' }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.message || 'Kayıt olunamadı.');
+        return;
+      }
+      setSuccessMessage(
+        data.message || 'Kayıt başarılı! E-postanıza gönderilen bağlantıyla hesabınızı onaylayın.'
+      );
+      setTimeout(() => navigate('/login'), 3000);
+    } catch (err) {
+      setError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className={`max-w-md mx-auto mt-20 p-6 rounded-lg shadow-md ${bgCard(theme)}`}>
       <h2 className={`text-2xl font-bold text-center mb-6 ${textPrimary(theme)}`}>Kayıt Ol</h2>
-      <form>
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-700 text-sm">{error}</div>
+      )}
+      {successMessage && (
+        <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-700 text-sm">{successMessage}</div>
+      )}
+      <form onSubmit={handleSubmit}>
         <div className="mb-4">
           <label className={`block mb-2 ${textMuted(theme)}`}>Ad Soyad</label>
-          <input type="text" className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`} />
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+          />
         </div>
         <div className="mb-4">
           <label className={`block mb-2 ${textMuted(theme)}`}>Email</label>
-          <input type="email" className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+          />
         </div>
         <div className="mb-6">
           <label className={`block mb-2 ${textMuted(theme)}`}>Şifre</label>
-          <input type="password" className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`} />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
+          />
         </div>
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
-          Kayıt Ol
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+        >
+          {isSubmitting ? 'Kayıt olunuyor...' : 'Kayıt Ol'}
         </button>
       </form>
       <p className={`text-center mt-4 text-sm ${textMuted(theme)}`}>
