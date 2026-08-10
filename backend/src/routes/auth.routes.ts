@@ -12,7 +12,15 @@ const router = Router();
 // Kayıt ol
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { email, password, fullName, role } = req.body;
+    const {
+      email, password, fullName, role,
+      accountType, mainBranch, secondaryBranch, institutionLevels,
+    } = req.body;
+
+    // Kurum hariç herkes için ana branş zorunlu
+    if (accountType !== 'kurum' && (!mainBranch || !mainBranch.trim())) {
+      return res.status(400).json({ message: 'Ana branş seçimi zorunludur.' });
+    }
 
     // Email kontrolü
     const existingUser = await db.select().from(users).where(eq(users.email, email));
@@ -30,6 +38,10 @@ router.post('/register', async (req: Request, res: Response) => {
       password: hashedPassword,
       fullName,
       role: role || 'teacher',
+      accountType: accountType || 'teacher',
+      mainBranch: mainBranch || null,
+      secondaryBranch: secondaryBranch || null,
+      institutionLevels: Array.isArray(institutionLevels) ? institutionLevels.join(',') : (institutionLevels || null),
       isEmailVerified: false,
       emailVerificationToken: verificationToken,
       createdAt: new Date(),
@@ -144,6 +156,10 @@ router.post('/login', async (req: Request, res: Response) => {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        accountType: user.accountType,
+        mainBranch: user.mainBranch,
+        secondaryBranch: user.secondaryBranch,
+        institutionLevels: user.institutionLevels,
       },
     });
   } catch (error) {
@@ -166,6 +182,10 @@ router.get('/me', async (req: Request, res: Response) => {
       fullName: user.fullName,
       role: user.role,
       profileImage: user.profileImage,
+      accountType: user.accountType,
+      mainBranch: user.mainBranch,
+      secondaryBranch: user.secondaryBranch,
+      institutionLevels: user.institutionLevels,
     });
   } catch (error: any) {
     res.status(500).json({ message: 'Profil getirilirken hata oluştu', error: error.message });

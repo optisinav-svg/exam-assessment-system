@@ -9,6 +9,7 @@ import {
   getStoredUser,
   loginRequest,
   registerRequest,
+  RegisterInput,
 } from '../services/api';
 
 interface AuthContextValue {
@@ -16,7 +17,7 @@ interface AuthContextValue {
   isLoading: boolean; // uygulama açılırken kayıtlı oturum kontrol ediliyor mu
   isSubmitting: boolean; // giriş/kayıt isteği gönderiliyor mu
   login: (email: string, password: string, role?: UserRole) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -46,11 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, fullName: string) => {
+  const register = async (input: RegisterInput) => {
     setIsSubmitting(true);
     try {
       // Artık kayıt sonrası otomatik giriş yapılmıyor — e-posta onayı gerekiyor.
-      await registerRequest(email, password, fullName);
+      await registerRequest(input);
     } finally {
       setIsSubmitting(false);
     }

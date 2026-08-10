@@ -77,6 +77,10 @@ export interface AuthUser {
   fullName: string;
   role: string;
   profileImage?: string | null;
+  accountType?: 'teacher' | 'kurum' | 'rehberlik' | 'egitim_kocu';
+  mainBranch?: string | null;
+  secondaryBranch?: string | null;
+  institutionLevels?: string | null;
 }
 
 export type UserRole = 'teacher' | 'student';
@@ -96,10 +100,20 @@ export async function resendVerificationEmail(email: string, role: UserRole) {
   return data;
 }
 
-export async function registerRequest(email: string, password: string, fullName: string) {
+export interface RegisterInput {
+  email: string;
+  password: string;
+  fullName: string;
+  accountType: 'teacher' | 'kurum';
+  mainBranch?: string;
+  secondaryBranch?: string;
+  institutionLevels?: string[];
+}
+
+export async function registerRequest(input: RegisterInput) {
   const { data } = await api.post<{ message: string; requiresEmailVerification: boolean }>(
     '/auth/register',
-    { email, password, fullName, role: 'teacher' }
+    { ...input, role: 'teacher' }
   );
   return data;
 }

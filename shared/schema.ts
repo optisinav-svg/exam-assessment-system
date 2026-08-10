@@ -22,6 +22,10 @@ export const users = pgTable('users', {
   profileImage: text('profile_image'),
   isEmailVerified: boolean('is_email_verified').default(true), // mevcut hesaplar etkilenmesin diye varsayılan true; yeni kayıtlar kodda elle false yapılıyor
   emailVerificationToken: varchar('email_verification_token', { length: 255 }),
+  accountType: varchar('account_type', { length: 20 }).default('teacher'), // 'teacher' | 'kurum' | 'rehberlik' | 'egitim_kocu'
+  mainBranch: varchar('main_branch', { length: 100 }), // ana branş (örn. Matematik — Geometri dahil kabul edilir)
+  secondaryBranch: varchar('secondary_branch', { length: 100 }), // yan branş (opsiyonel)
+  institutionLevels: text('institution_levels'), // 'ilkokul,ortaokul,lise,kurs' — virgülle ayrılmış
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -78,6 +82,7 @@ export const studentEnrollments = pgTable('student_enrollments', {
   teacherId: integer('teacher_id').references(() => users.id).notNull(),
   status: varchar('status', { length: 20 }).default('active'), // active | transferred | pending
   joinMethod: varchar('join_method', { length: 20 }), // roster | code | email_request
+  institutionStudentNo: varchar('institution_student_no', { length: 50 }), // bu kurumdaki (okul/kurs) özel öğrenci numarası
   startDate: timestamp('start_date').defaultNow(),
   endDate: timestamp('end_date'), // null = hâlâ aktif
 });

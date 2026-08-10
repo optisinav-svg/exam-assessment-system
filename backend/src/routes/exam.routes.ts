@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../index';
-import { exams, examClasses, results, examQuestions } from '../../../shared/schema';
+import { exams, examClasses, results, examQuestions, users } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 const router = Router();
@@ -64,6 +64,19 @@ router.post('/', async (req: Request, res: Response) => {
       questions, // [{ questionNumber, subjectId, learningOutcomeId?, customOutcomeText?, correctAnswer }]
     } = req.body;
     const teacherId = req.user?.id;
+    if (!teacherId) {
+      return res.status(401).json({ message: 'Yetkilendirme gerekli' });
+    }
+
+    // Kurum olmayan hesaplar TYT/AYT/LGS denemesi oluşturamaz, sadece Konu Taraması
+    if (examType && examType !== 'custom') {
+      const [account] = await db.select({ accountType: users.accountType }).from(users).where(eq(users.id, teacherId));
+      if (!account || account.accountType !== 'kurum') {
+        return res.status(403).json({
+          message: 'TYT/AYT/LGS denemesi hazırlamak yalnızca Kurum hesaplarına açıktır. Siz Konu Taraması testi oluşturabilirsiniz.',
+        });
+      }
+    }
 
     const [exam] = await db.insert(exams).values({
       teacherId,

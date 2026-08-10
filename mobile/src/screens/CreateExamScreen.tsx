@@ -27,6 +27,8 @@ import {
   SchoolClass,
   LearningOutcome,
 } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const OPTION_LETTERS: Record<number, string[]> = {
   3: ['A', 'B', 'C'],
@@ -73,6 +75,25 @@ const LGS_SUBJECTS: { name: string; count: number }[] = [
   { name: 'Fen Bilimleri', count: 20 },
 ];
 
+// Kayıt ekranındaki "Ana Branş" seçiminin, gerçek ders (subject) adlarıyla eşleşmesi
+// (öğretmen sadece kendi branşıyla ilgili derslerden konu taraması oluşturabilsin diye)
+const BRANCH_SUBJECT_MAP: Record<string, string[]> = {
+  'Türkçe / Türk Dili ve Edebiyatı': ['Türkçe', 'Türk Dili ve Edebiyatı'],
+  'Matematik / Geometri': ['Matematik', 'Geometri'],
+  'Fen Bilimleri': ['Fen', 'Fen Bilimleri', 'Fizik', 'Kimya', 'Biyoloji'],
+  'Sosyal Bilgiler': ['Sosyal', 'Sosyal Bilgiler'],
+  Tarih: ['Tarih', 'T.C.İnkılap Tarihi ve Atatürkçülük', 'T.C. İnkılap Tarihi ve Atatürkçülük'],
+  Coğrafya: ['Coğrafya'],
+  Felsefe: ['Felsefe'],
+  Fizik: ['Fizik'],
+  Kimya: ['Kimya'],
+  Biyoloji: ['Biyoloji'],
+  'Din Kültürü ve Ahlak Bilgisi': ['Din Kültürü ve Ahlak Bilgisi'],
+  İngilizce: ['İngilizce', 'Yabancı Dil'],
+  'T.C. İnkılap Tarihi ve Atatürkçülük': ['T.C.İnkılap Tarihi ve Atatürkçülük', 'T.C. İnkılap Tarihi ve Atatürkçülük'],
+  'Hayat Bilgisi': ['Hayat Bilgisi'],
+};
+
 function todayIso(): string {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -94,6 +115,9 @@ interface QuestionOutcome {
 }
 
 export default function CreateExamScreen({ navigation, route }: any) {
+  const { user } = useAuth();
+  const { colors } = useTheme();
+  const isKurum = user?.accountType === 'kurum';
   const editingExamId: number | undefined = route?.params?.examId;
   const [isEditMode] = useState(!!editingExamId);
   const [isLoadingExam, setIsLoadingExam] = useState(!!editingExamId);
@@ -456,7 +480,7 @@ export default function CreateExamScreen({ navigation, route }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>‹ Geri</Text>
@@ -483,21 +507,30 @@ export default function CreateExamScreen({ navigation, route }: any) {
           editable={!isSubmitting}
         />
 
-        <Text style={[styles.label, { marginTop: 20 }]}>Sınav Türü</Text>
-        <View style={styles.modeRow}>
-          {(['TYT', 'AYT', 'LGS', 'custom'] as ExamMode[]).map((mode) => (
-            <TouchableOpacity
-              key={mode}
-              style={[styles.modeButton, examMode === mode && styles.modeButtonActive]}
-              onPress={() => applyExamMode(mode)}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.modeButtonText, examMode === mode && styles.modeButtonTextActive]}>
-                {mode === 'custom' ? 'Konu Taraması' : mode}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {isKurum ? (
+          <>
+            <Text style={[styles.label, { marginTop: 20 }]}>Sınav Türü</Text>
+            <View style={styles.modeRow}>
+              {(['TYT', 'AYT', 'LGS', 'custom'] as ExamMode[]).map((mode) => (
+                <TouchableOpacity
+                  key={mode}
+                  style={[styles.modeButton, examMode === mode && styles.modeButtonActive]}
+                  onPress={() => applyExamMode(mode)}
+                  disabled={isSubmitting}
+                >
+                  <Text style={[styles.modeButtonText, examMode === mode && styles.modeButtonTextActive]}>
+                    {mode === 'custom' ? 'Konu Taraması' : mode}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        ) : (
+          <Text style={[styles.helperText, { marginTop: 20 }]}>
+            Bu hesap türü sadece Konu Taraması testi oluşturabilir (kendi branşınız). TYT/AYT/LGS
+            denemesi hazırlamak Kurum hesaplarına özeldir.
+          </Text>
+        )}
 
         {examMode === 'AYT' && (
           <View style={styles.tytLinkBox}>
@@ -533,6 +566,14 @@ export default function CreateExamScreen({ navigation, route }: any) {
               <View style={styles.chipRow}>
                 {allSubjects
                   .filter((s) => !subjectBlocks.some((b) => b.subjectId === s.id))
+                  .filter((s) => {
+                    if (isKurum) return true; // Kurum tüm derslerden test oluşturabilir
+                    const allowedNames = [
+                      ...(user?.mainBranch ? BRANCH_SUBJECT_MAP[user.mainBranch] || [user.mainBranch] : []),
+                      ...(user?.secondaryBranch ? BRANCH_SUBJECT_MAP[user.secondaryBranch] || [user.secondaryBranch] : []),
+                    ];
+                    return allowedNames.length === 0 || allowedNames.includes(s.name);
+                  })
                   .map((s) => (
                     <TouchableOpacity key={s.id} style={styles.chip} onPress={() => addExistingSubjectBlock(s)}>
                       <Text style={styles.chipText}>+ {s.name}</Text>
