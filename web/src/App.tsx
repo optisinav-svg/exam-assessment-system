@@ -155,11 +155,15 @@ function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNeedsVerification(false);
+    setResendMessage('');
     if (!email.trim() || !password) {
       setError('Lütfen e-posta ve şifrenizi girin.');
       return;
@@ -174,6 +178,7 @@ function LoginPage() {
       const data = await response.json();
       if (!response.ok) {
         setError(data.message || 'Giriş yapılamadı.');
+        if (data.requiresEmailVerification) setNeedsVerification(true);
         return;
       }
       localStorage.setItem('optiksinav-token', data.token);
@@ -187,11 +192,40 @@ function LoginPage() {
     }
   };
 
+  const handleResend = async () => {
+    setResendMessage('');
+    try {
+      const response = await fetch(`${API_BASE}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await response.json();
+      setResendMessage(data.message || (response.ok ? 'Gönderildi.' : 'Gönderilemedi.'));
+    } catch (err) {
+      setResendMessage('Sunucuya bağlanılamadı.');
+    }
+  };
+
   return (
     <div className={`max-w-md mx-auto mt-20 p-6 rounded-lg shadow-md ${bgCard(theme)}`}>
       <h2 className={`text-2xl font-bold text-center mb-6 ${textPrimary(theme)}`}>Giriş Yap</h2>
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-700 text-sm">{error}</div>
+        <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-700 text-sm">
+          {error}
+          {needsVerification && (
+            <button
+              type="button"
+              onClick={handleResend}
+              className="block mt-2 text-blue-600 hover:underline font-medium"
+            >
+              Onay e-postasını tekrar gönder
+            </button>
+          )}
+        </div>
+      )}
+      {resendMessage && (
+        <div className="mb-4 p-3 rounded-lg bg-blue-100 text-blue-700 text-sm">{resendMessage}</div>
       )}
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
