@@ -108,11 +108,20 @@ router.post('/register', async (req: Request, res: Response) => {
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const verifyUrl = `${baseUrl}/api/student-auth/verify-email/${verificationToken}`;
-      await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(fullName, verifyUrl));
+      let emailSent = true;
+      try {
+        await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(fullName, verifyUrl));
+      } catch (emailError: any) {
+        emailSent = false;
+        console.error('[student-auth/register] E-posta gönderilemedi:', emailError?.message || emailError);
+      }
 
       return res.status(201).json({
-        message: `${school.name} - ${cls.name} sınıfına katıldınız. Lütfen e-postanızı onaylayın.`,
+        message: emailSent
+          ? `${school.name} - ${cls.name} sınıfına katıldınız. Lütfen e-postanızı onaylayın.`
+          : `${school.name} - ${cls.name} sınıfına katıldınız, ancak onay e-postası gönderilemedi. "Onay e-postasını tekrar gönder" seçeneğini kullanın.`,
         studentId: newStudent.id,
+        emailSent,
       });
     }
 
@@ -142,18 +151,27 @@ router.post('/register', async (req: Request, res: Response) => {
       createdAt: new Date(),
     }).returning();
 
-    // E-posta onay bağlantısı gönder
+    // E-posta onay bağlantısı gönder — başarısız olsa bile kayıt iptal olmasın
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verifyUrl = `${baseUrl}/api/student-auth/verify-email/${verificationToken}`;
-    await sendEmail(
-      email,
-      'OptikSınav - E-posta Onayı',
-      verificationEmailHtml(fullName, verifyUrl)
-    );
+    let emailSent = true;
+    try {
+      await sendEmail(
+        email,
+        'OptikSınav - E-posta Onayı',
+        verificationEmailHtml(fullName, verifyUrl)
+      );
+    } catch (emailError: any) {
+      emailSent = false;
+      console.error('[student-auth/register] E-posta gönderilemedi:', emailError?.message || emailError);
+    }
 
     res.status(201).json({
-      message: 'Kayıt isteğiniz alındı. Lütfen e-postanızı onaylayın, ardından öğretmeninizin onayını bekleyin.',
+      message: emailSent
+        ? 'Kayıt isteğiniz alındı. Lütfen e-postanızı onaylayın, ardından öğretmeninizin onayını bekleyin.'
+        : 'Kayıt isteğiniz alındı, ancak onay e-postası gönderilemedi. "Onay e-postasını tekrar gönder" seçeneğini kullanın.',
       studentId: newStudent.id,
+      emailSent,
     });
   } catch (error: any) {
     console.error('Student register error:', error);
@@ -163,6 +181,39 @@ router.post('/register', async (req: Request, res: Response) => {
 
 // ─── GET /api/student-auth/verify-email/:token ───────────────────────────────
 // Öğrencinin e-posta onay bağlantısına tıklamasıyla çalışır
+// ─── POST /api/student-auth/resend-verification ──────────────────────────────
+router.post('/resend-verification', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const [student] = await db.select().from(students).where(eq(students.email, email));
+
+    if (!student) {
+      return res.status(404).json({ message: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.' });
+    }
+    if (student.isEmailVerified) {
+      return res.status(400).json({ message: 'Bu hesap zaten onaylı. Giriş yapmayı deneyin.' });
+    }
+
+    let token = student.emailVerificationToken;
+    if (!token) {
+      token = crypto.randomBytes(32).toString('hex');
+      await db.update(students).set({ emailVerificationToken: token }).where(eq(students.id, student.id));
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const verifyUrl = `${baseUrl}/api/student-auth/verify-email/${token}`;
+    await sendEmail(
+      email,
+      'OptikSınav - E-posta Onayı',
+      verificationEmailHtml(`${student.firstName} ${student.lastName}`, verifyUrl)
+    );
+
+    res.json({ message: 'Onay e-postası tekrar gönderildi. Lütfen gelen kutunuzu (ve spam klasörünü) kontrol edin.' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'E-posta gönderilirken hata oluştu', error: error.message });
+  }
+});
+
 router.get('/verify-email/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
@@ -235,6 +286,7 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!student.isEmailVerified) {
       return res.status(403).json({
         message: 'Lütfen önce e-postanızı onaylayın (kayıt olurken gönderilen bağlantı).',
+        requiresEmailVerification: true,
       });
     }
 

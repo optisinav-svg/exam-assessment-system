@@ -35,17 +35,57 @@ router.post('/register', async (req: Request, res: Response) => {
       createdAt: new Date(),
     }).returning();
 
-    // Onay e-postası gönder
+    // Onay e-postası gönder — bu başarısız olsa bile kayıt işlemi iptal OLMASIN
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verifyUrl = `${baseUrl}/api/auth/verify-email/${verificationToken}`;
-    await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(fullName, verifyUrl));
+    let emailSent = true;
+    try {
+      await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(fullName, verifyUrl));
+    } catch (emailError: any) {
+      emailSent = false;
+      console.error('[auth/register] E-posta gönderilemedi:', emailError?.message || emailError);
+    }
 
     res.status(201).json({
-      message: 'Kayıt başarılı. Lütfen e-postanıza gönderilen bağlantıyla hesabınızı onaylayın.',
+      message: emailSent
+        ? 'Kayıt başarılı. Lütfen e-postanıza gönderilen bağlantıyla hesabınızı onaylayın.'
+        : 'Kayıt başarılı, ancak onay e-postası gönderilemedi. Lütfen "Onay e-postasını tekrar gönder" seçeneğini kullanın.',
       requiresEmailVerification: true,
+      emailSent,
     });
   } catch (error) {
     res.status(500).json({ message: 'Kayıt olurken hata oluştu', error });
+  }
+});
+
+// ─── POST /api/auth/resend-verification ───────────────────────────────────
+// E-posta gönderimi başarısız olduysa veya kullanıcı maili bulamadıysa
+router.post('/resend-verification', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+
+    if (!user) {
+      return res.status(404).json({ message: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.' });
+    }
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: 'Bu hesap zaten onaylı. Doğrudan giriş yapabilirsiniz.' });
+    }
+
+    // Token yoksa (eski kayıt) yeni bir tane üret
+    let token = user.emailVerificationToken;
+    if (!token) {
+      token = crypto.randomBytes(32).toString('hex');
+      await db.update(users).set({ emailVerificationToken: token }).where(eq(users.id, user.id));
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const verifyUrl = `${baseUrl}/api/auth/verify-email/${token}`;
+    await sendEmail(email, 'OptikSınav - E-posta Onayı', verificationEmailHtml(user.fullName, verifyUrl));
+
+    res.json({ message: 'Onay e-postası tekrar gönderildi. Lütfen gelen kutunuzu (ve spam klasörünü) kontrol edin.' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'E-posta gönderilirken hata oluştu', error: error.message });
   }
 });
 

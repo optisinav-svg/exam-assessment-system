@@ -90,6 +90,12 @@ export async function loginRequest(email: string, password: string, role: UserRo
   return data;
 }
 
+export async function resendVerificationEmail(email: string, role: UserRole) {
+  const endpoint = role === 'teacher' ? '/auth/resend-verification' : '/student-auth/resend-verification';
+  const { data } = await api.post<{ message: string }>(endpoint, { email });
+  return data;
+}
+
 export async function registerRequest(email: string, password: string, fullName: string) {
   const { data } = await api.post<{ message: string; requiresEmailVerification: boolean }>(
     '/auth/register',

@@ -18,6 +18,7 @@ import {
   getRememberedCredentials,
   saveRememberedCredentials,
   clearRememberedCredentials,
+  resendVerificationEmail,
 } from '../services/api';
 
 export default function LoginScreen({ navigation }: any) {
@@ -60,7 +61,28 @@ export default function LoginScreen({ navigation }: any) {
       const message =
         error?.response?.data?.message ||
         'Giriş yapılamadı. E-posta veya şifreniz hatalı olabilir.';
-      Alert.alert('Giriş başarısız', message);
+
+      if (error?.response?.data?.requiresEmailVerification) {
+        Alert.alert('Giriş başarısız', message, [
+          { text: 'Vazgeç', style: 'cancel' },
+          {
+            text: 'Onay e-postasını tekrar gönder',
+            onPress: async () => {
+              try {
+                const result = await resendVerificationEmail(email.trim(), role);
+                Alert.alert('Gönderildi', result.message);
+              } catch (resendError: any) {
+                Alert.alert(
+                  'Hata',
+                  resendError?.response?.data?.message || 'E-posta gönderilemedi, tekrar deneyin.'
+                );
+              }
+            },
+          },
+        ]);
+      } else {
+        Alert.alert('Giriş başarısız', message);
+      }
     }
   };
 
