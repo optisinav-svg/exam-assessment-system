@@ -29,7 +29,7 @@ router.post('/students', async (req: any, res: express.Response) => {
       return res.status(401).json({ message: 'Kimlik doğrulama gerekli' });
     }
 
-    const { classId, firstName, lastName, studentNo, parentPhone } = req.body;
+    const { classId, firstName, lastName, studentNo, parentPhone, institutionStudentNo } = req.body;
 
     if (!classId || !firstName?.trim() || !lastName?.trim()) {
       return res.status(400).json({ message: 'Sınıf, ad ve soyad zorunludur' });
@@ -77,6 +77,16 @@ router.post('/students', async (req: any, res: express.Response) => {
         isActive: true,
       })
       .returning();
+
+    // Kayıt geçmişi: bu kurum/sınıf için (varsa kuruma özel numarasıyla) aktif kayıt oluştur
+    await db.insert(studentEnrollments).values({
+      studentId: newStudent.id,
+      classId: parseInt(classId),
+      teacherId,
+      status: 'active',
+      joinMethod: 'roster',
+      institutionStudentNo: institutionStudentNo?.trim() || studentNo?.trim() || null,
+    });
 
     res.status(201).json({
       success: true,
