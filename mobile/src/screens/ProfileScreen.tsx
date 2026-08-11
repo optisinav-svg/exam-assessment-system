@@ -11,7 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getMyProfile, updateMyProfile, updateMyPassword } from '../services/api';
@@ -24,6 +27,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [isLoading, setIsLoading] = useState(true);
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [profileImage, setProfileImage] = useState<string | null | undefined>(user?.profileImage);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [savingName, setSavingName] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -37,6 +42,7 @@ export default function ProfileScreen({ navigation }: any) {
         const profile = await getMyProfile(role);
         setFullName(profile.fullName);
         setEmail(profile.email);
+        setProfileImage(profile.profileImage);
       } catch (error) {
         // Profil alınamazsa, elimizdeki (giriş sırasında gelen) bilgilerle devam ederiz
       } finally {
@@ -44,6 +50,46 @@ export default function ProfileScreen({ navigation }: any) {
       }
     })();
   }, []);
+
+  const handlePickPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('İzin gerekli', 'Fotoğraf seçebilmek için galeri izni vermeniz gerekiyor.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      // Küçük boyuta indir + sıkıştır (veritabanına metin olarak kaydedileceği için)
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 200, height: 200 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+
+      if (!manipulated.base64) {
+        throw new Error('Görsel işlenemedi');
+      }
+      const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+
+      await updateMyProfile(role, { profileImage: dataUri });
+      setProfileImage(dataUri);
+      Alert.alert('Başarılı', 'Profil fotoğrafınız güncellendi.');
+    } catch (error: any) {
+      Alert.alert('Hata', error?.response?.data?.message || 'Fotoğraf yüklenemedi.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const handleSaveName = async () => {
     if (!fullName.trim()) {
@@ -113,13 +159,21 @@ export default function ProfileScreen({ navigation }: any) {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>‹ Geri</Text>
           </TouchableOpacity>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>
-              {fullName ? fullName.trim().charAt(0).toUpperCase() : '?'}
-            </Text>
-          </View>
+          <TouchableOpacity onPress={handlePickPhoto} disabled={isUploadingPhoto}>
+            <View style={styles.avatarPlaceholder}>
+              {isUploadingPhoto ? (
+                <ActivityIndicator color="#fff" />
+              ) : profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarInitial}>
+                  {fullName ? fullName.trim().charAt(0).toUpperCase() : '?'}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
           <Text style={styles.title}>Profil</Text>
-          <Text style={styles.avatarNote}>Profil fotoğrafı yakında eklenecek</Text>
+          <Text style={styles.avatarNote}>Değiştirmek için fotoğrafa dokunun</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -268,6 +322,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   avatarInitial: {
     fontSize: 30,
