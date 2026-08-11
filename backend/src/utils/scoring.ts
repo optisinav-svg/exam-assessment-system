@@ -19,6 +19,7 @@ export interface ScoringInput {
   totalQuestions: number;
   optionCount?: OptionCount | number;
   negativeMarking?: boolean;
+  totalScore?: number; // sınavın tam puanı (varsayılan 100)
 }
 
 export interface ScoringResult {
@@ -26,7 +27,7 @@ export interface ScoringResult {
   wrongCount: number;
   emptyCount: number;
   net: number;
-  score: number; // 100 üzerinden karşılığı
+  score: number; // sınavın totalScore'u üzerinden karşılığı
 }
 
 // Seçenek sayısına göre "kaç yanlış 1 doğruyu eksiltir" katsayısı
@@ -48,6 +49,7 @@ export function calculateNet({
   totalQuestions,
   optionCount = 4,
   negativeMarking = true,
+  totalScore = 100,
 }: ScoringInput): ScoringResult {
   const safeCorrect = Math.max(0, correctCount);
   const safeWrong = Math.max(0, wrongCount);
@@ -65,7 +67,7 @@ export function calculateNet({
   net = Math.max(0, Math.round(net * 100) / 100);
 
   const score =
-    totalQuestions > 0 ? Math.round((net / totalQuestions) * 100) : 0;
+    totalQuestions > 0 ? Math.round((net / totalQuestions) * totalScore) : 0;
 
   return {
     correctCount: safeCorrect,
