@@ -65,8 +65,9 @@ router.post('/register', async (req: Request, res: Response) => {
       requiresEmailVerification: true,
       emailSent,
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Kayıt olurken hata oluştu', error });
+  } catch (error: any) {
+    console.error('[auth/register] Hata:', error?.message || error, error?.stack);
+    res.status(500).json({ message: 'Kayıt olurken hata oluştu', error: error?.message });
   }
 });
 
@@ -162,8 +163,9 @@ router.post('/login', async (req: Request, res: Response) => {
         institutionLevels: user.institutionLevels,
       },
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Giriş yaparken hata oluştu', error });
+  } catch (error: any) {
+    console.error('[auth/login] Hata:', error?.message || error, error?.stack);
+    res.status(500).json({ message: 'Giriş yaparken hata oluştu', error: error?.message });
   }
 });
 

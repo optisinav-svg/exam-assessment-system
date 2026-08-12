@@ -101,9 +101,10 @@ export default function RegisterScreen({ navigation }: any) {
         [{ text: 'Tamam', onPress: () => navigation.navigate('Login') }]
       );
     } catch (error: any) {
+      const detail = error?.response?.data?.error;
       const message =
-        error?.response?.data?.message ||
-        'Kayıt oluşturulamadı. Bu e-posta adresi zaten kayıtlı olabilir.';
+        (error?.response?.data?.message || 'Kayıt oluşturulamadı. Bu e-posta adresi zaten kayıtlı olabilir.') +
+        (detail ? `\n\n(Teknik detay: ${detail})` : '');
       Alert.alert('Kayıt başarısız', message);
     }
   };

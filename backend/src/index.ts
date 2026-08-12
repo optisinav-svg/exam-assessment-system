@@ -30,6 +30,11 @@ const port = process.env.PORT || 5000;
 // Veritabanı bağlantısı
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 20000, // Neon uyku halinden uyanırken zaman tanı
+  idleTimeoutMillis: 30000,
+});
+pool.on('error', (err) => {
+  console.error('[pg pool] Beklenmeyen hata:', err.message);
 });
 const db = drizzle(pool, { schema });
 

@@ -58,9 +58,10 @@ export default function LoginScreen({ navigation }: any) {
         await clearRememberedCredentials();
       }
     } catch (error: any) {
+      const detail = error?.response?.data?.error;
       const message =
-        error?.response?.data?.message ||
-        'Giriş yapılamadı. E-posta veya şifreniz hatalı olabilir.';
+        (error?.response?.data?.message || 'Giriş yapılamadı. E-posta veya şifreniz hatalı olabilir.') +
+        (detail ? `\n\n(Teknik detay: ${detail})` : '');
 
       if (error?.response?.data?.requiresEmailVerification) {
         Alert.alert('Giriş başarısız', message, [
