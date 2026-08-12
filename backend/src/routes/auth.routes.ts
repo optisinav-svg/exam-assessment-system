@@ -164,8 +164,9 @@ router.post('/login', async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
-    console.error('[auth/login] Hata:', error?.message || error, error?.stack);
-    res.status(500).json({ message: 'Giriş yaparken hata oluştu', error: error?.message });
+    console.error('[auth/login] Hata:', error?.message || error);
+    console.error('[auth/login] Neden:', error?.cause?.message || error?.cause || 'yok');
+    res.status(500).json({ message: 'Giriş yaparken hata oluştu', error: error?.cause?.message || error?.message });
   }
 });
 
