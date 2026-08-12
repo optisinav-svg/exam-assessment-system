@@ -257,4 +257,16 @@ router.put('/password', async (req: Request, res: Response) => {
   }
 });
 
+// ─── GEÇİCİ TEŞHİS: users tablosundaki sütunları listeler (sorun çözülünce silinecek) ──
+router.get('/_debug-columns', async (req: Request, res: Response) => {
+  try {
+    const result = await db.execute(
+      `SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users' ORDER BY ordinal_position`
+    );
+    res.json(result.rows || result);
+  } catch (error: any) {
+    res.status(500).json({ message: 'Sorgu hatası', error: error?.message });
+  }
+});
+
 export default router;
