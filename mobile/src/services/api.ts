@@ -15,7 +15,7 @@ const USER_KEY = 'auth_user';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
 });
 
 // Her istekte, cihazda saklanan oturum anahtarını (token) otomatik ekle
