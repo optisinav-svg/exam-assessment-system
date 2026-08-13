@@ -21,6 +21,7 @@ import subjectRoutes from './routes/subject.routes';
 import learningOutcomesRoutes from './routes/learning-outcomes.routes';
 import { verifyToken } from './middleware/auth.middleware';
 import { seedKazanimlar } from './seed-kazanimlar';
+import { runSafeMigrations } from './safe-migrations';
 
 dotenv.config();
 
@@ -77,8 +78,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`🚀 Server running on port ${port}`);
+  await runSafeMigrations();
   seedKazanimlar();
 });
 
