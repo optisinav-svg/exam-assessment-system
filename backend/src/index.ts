@@ -19,6 +19,7 @@ import studentAuthRoutes from './routes/student-auth.routes';
 import studentRoutes from './routes/student.routes';
 import subjectRoutes from './routes/subject.routes';
 import learningOutcomesRoutes from './routes/learning-outcomes.routes';
+import institutionRoutes from './routes/institution.routes';
 import { verifyToken } from './middleware/auth.middleware';
 import { seedKazanimlar } from './seed-kazanimlar';
 import { runSafeMigrations } from './safe-migrations';
@@ -68,6 +69,7 @@ app.use('/api/student-auth', studentAuthRoutes); // Öğrenci kayıt/giriş/e-po
 app.use('/api/students', verifyToken, studentRoutes); // Öğrenci onay/listeleme - öğretmen girişi gerektirir
 app.use('/api/subjects', verifyToken, subjectRoutes); // Dersler - giriş gerektirir
 app.use('/api/learning-outcomes', verifyToken, learningOutcomesRoutes); // Kazanım yönetimi - giriş gerektirir
+app.use('/api/institution', verifyToken, institutionRoutes); // Kurum paneli yönetimi - kurum hesabı gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

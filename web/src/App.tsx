@@ -122,6 +122,7 @@ function AppRoutes() {
         <Route path="/score-calculator" element={<ScoreCalculatorPage />} />
         <Route path="/outcomes" element={<OutcomesPage />} />
         <Route path="/overview" element={<OverviewPage />} />
+        <Route path="/institution" element={<InstitutionPage />} />
         <Route path="/storage" element={<StoragePage />} />
         <Route path="/pricing" element={<PricingPage />} />
       </Routes>
@@ -558,6 +559,11 @@ function DashboardPage() {
           <a href="/admin" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
             ⚙️ Admin
           </a>
+          {JSON.parse(localStorage.getItem('optiksinav-user') || '{}').accountType === 'kurum' && (
+            <a href="/institution" className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
+              🏢 Kurum Paneli
+            </a>
+          )}
         </nav>
       </div>
 
@@ -4068,6 +4074,231 @@ function OutcomesPage() {
   );
 }
 
+// ─── Kurum Paneli ────────────────────────────────────────────────────────────
+function InstitutionPage() {
+  const { theme } = useTheme();
+  const [stats, setStats] = useState({ teacherCount: 0, studentCount: 0, totalExams: 0 });
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'teacher' | 'student'>('teacher');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('optiksinav-user') || '{}');
+    } catch {
+      return {};
+    }
+  })();
+  const isInstitution = currentUser.accountType === 'kurum';
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  const fetchInstitutionData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [statsResponse, membersResponse] = await Promise.all([
+        fetch(`${API_BASE}/institution/stats`, { headers: authHeaders }),
+        fetch(`${API_BASE}/institution/members`, { headers: authHeaders }),
+      ]);
+
+      if (!statsResponse.ok || !membersResponse.ok) {
+        const failedResponse = !statsResponse.ok ? statsResponse : membersResponse;
+        const data = await failedResponse.json().catch(() => ({}));
+        throw new Error(data.message || 'Kurum verileri yüklenemedi.');
+      }
+
+      const statsData = await statsResponse.json();
+      const membersData = await membersResponse.json();
+      setStats(statsData.stats || { teacherCount: 0, studentCount: 0, totalExams: 0 });
+      setMembers(membersData.members || []);
+    } catch (err: any) {
+      setError(err.message || 'Kurum verileri yüklenemedi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isInstitution) fetchInstitutionData();
+  }, [isInstitution]);
+
+  const handleInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Lütfen bir e-posta adresi girin.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE}/institution/invite`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, role }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || 'Davet gönderilemedi.');
+      }
+      setSuccess(data.message || 'Davet başarıyla gönderildi.');
+      setEmail('');
+      await fetchInstitutionData();
+    } catch (err: any) {
+      setError(err.message || 'Davet gönderilemedi.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!isInstitution) {
+    return (
+      <div className="max-w-xl mx-auto mt-16 p-8 text-center rounded-xl shadow-sm border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700">
+        <div className="text-5xl mb-4">🔒</div>
+        <h1 className={`text-2xl font-bold mb-2 ${textPrimary(theme)}`}>Kurum Paneli</h1>
+        <p className={textSecondary(theme)}>Bu sayfaya yalnızca kurum hesapları erişebilir.</p>
+        <a href="/overview" className="inline-block mt-6 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Genel Bakışa Dön</a>
+      </div>
+    );
+  }
+
+  const statCards = [
+    { label: 'Toplam Öğretmen', value: stats.teacherCount, icon: '👩‍🏫', color: 'text-blue-600' },
+    { label: 'Toplam Öğrenci', value: stats.studentCount, icon: '👨‍🎓', color: 'text-purple-600' },
+    { label: 'Toplam Sınav', value: stats.totalExams, icon: '📝', color: 'text-green-600' },
+  ];
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto transition-colors duration-300">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>🏢 Kurum Paneli</h1>
+          <p className={`mt-1 text-sm ${textSecondary(theme)}`}>Kurumunuza bağlı öğretmen ve öğrencilerin genel görünümü.</p>
+        </div>
+        <a href="/overview" className={`px-4 py-2 rounded-lg text-sm border ${bgCard(theme)} ${textMuted(theme)} ${borderColor(theme)} hover:border-blue-400`}>← Genel Bakış</a>
+      </div>
+
+      {error && <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">⚠️ {error}</div>}
+      {success && <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">✓ {success}</div>}
+
+      {loading ? (
+        <div className={`p-12 text-center rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} ${textSecondary(theme)}`}>Kurum verileri yükleniyor...</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {statCards.map((card) => (
+              <div key={card.label} className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{card.icon}</span>
+                  <div>
+                    <h2 className={`text-sm ${textSecondary(theme)}`}>{card.label}</h2>
+                    <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className={`lg:col-span-2 rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+              <div className={`px-5 py-4 border-b ${borderColor2(theme)} flex items-center justify-between`}>
+                <div>
+                  <h2 className={`font-semibold ${textPrimary(theme)}`}>Bağlı Üyeler</h2>
+                  <p className={`text-xs mt-1 ${textSecondary(theme)}`}>{members.length} kayıt listeleniyor</p>
+                </div>
+                <button type="button" onClick={fetchInstitutionData} className={`px-3 py-2 rounded-lg text-sm border ${borderColor2(theme)} ${textMuted(theme)} hover:border-blue-400`}>Yenile</button>
+              </div>
+              {members.length === 0 ? (
+                <div className={`p-10 text-center ${textSecondary(theme)}`}>
+                  <div className="text-4xl mb-3">👥</div>
+                  Henüz bağlı öğretmen veya öğrenci bulunmuyor.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}>
+                      <tr>
+                        <th className={`px-5 py-3 font-semibold ${textMuted(theme)}`}>Üye</th>
+                        <th className={`px-5 py-3 font-semibold ${textMuted(theme)}`}>Rol</th>
+                        <th className={`px-5 py-3 font-semibold ${textMuted(theme)}`}>Durum</th>
+                        <th className={`px-5 py-3 font-semibold ${textMuted(theme)}`}>Katılım</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${borderColor2(theme)}`}>
+                      {members.map((member: any) => {
+                        const details = member.details || {};
+                        const displayName = member.role === 'student'
+                          ? `${details.firstName || ''} ${details.lastName || ''}`.trim() || member.email || 'Öğrenci'
+                          : details.fullName || member.email || 'Öğretmen';
+                        const displayEmail = details.email || member.email || '—';
+                        return (
+                          <tr key={member.id} className={theme === 'dark' ? 'hover:bg-gray-700/60' : 'hover:bg-gray-50'}>
+                            <td className="px-5 py-3">
+                              <div className={`font-medium ${textPrimary(theme)}`}>{displayName}</div>
+                              <div className={`text-xs mt-0.5 ${textSecondary(theme)}`}>{displayEmail}</div>
+                            </td>
+                            <td className={`px-5 py-3 ${textMuted(theme)}`}>{member.role === 'student' ? 'Öğrenci' : 'Öğretmen'}</td>
+                            <td className="px-5 py-3">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs ${member.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                                {member.status === 'pending' ? 'Beklemede' : 'Aktif'}
+                              </span>
+                            </td>
+                            <td className={`px-5 py-3 text-xs ${textSecondary(theme)}`}>
+                              {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('tr-TR') : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className={`p-5 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)}`}>
+              <h2 className={`font-semibold ${textPrimary(theme)}`}>Davet Et</h2>
+              <p className={`text-sm mt-1 mb-5 ${textSecondary(theme)}`}>Kurumunuza bir öğretmen veya öğrenciyi e-posta adresiyle ekleyin.</p>
+              <form onSubmit={handleInvite}>
+                <label className={`block text-sm mb-2 ${textMuted(theme)}`} htmlFor="institution-member-email">E-posta</label>
+                <input
+                  id="institution-member-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="ornek@mail.com"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputBg(theme)}`}
+                  disabled={submitting}
+                />
+                <label className={`block text-sm mt-4 mb-2 ${textMuted(theme)}`} htmlFor="institution-member-role">Üye türü</label>
+                <select
+                  id="institution-member-role"
+                  value={role}
+                  onChange={(event) => setRole(event.target.value as 'teacher' | 'student')}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputBg(theme)}`}
+                  disabled={submitting}
+                >
+                  <option value="teacher">Öğretmen</option>
+                  <option value="student">Öğrenci</option>
+                </select>
+                <button type="submit" disabled={submitting} className="w-full mt-5 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">
+                  {submitting ? 'Gönderiliyor...' : 'Davet Gönder'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Genel Bakış / Özet Ekranı ─────────────────────────────────────────────
 function OverviewPage() {
   const { theme } = useTheme();
@@ -4262,6 +4493,11 @@ function OverviewPage() {
               <a href="/score-calculator" className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} ${textPrimary(theme)}`}>
                 🧮 Puan Hesapla
               </a>
+              {JSON.parse(localStorage.getItem('optiksinav-user') || '{}').accountType === 'kurum' && (
+                <a href="/institution" className={`p-3 rounded-lg text-center text-sm font-medium transition-colors ${theme === 'dark' ? 'bg-indigo-900 hover:bg-indigo-800' : 'bg-indigo-50 hover:bg-indigo-100'} text-indigo-600`}>
+                  🏢 Kurum Paneli
+                </a>
+              )}
             </div>
           </div>
         </>
