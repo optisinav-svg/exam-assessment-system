@@ -262,6 +262,13 @@ function LoginPage() {
 }
 
 // Kayıt Sayfası
+const MAIN_BRANCHES = [
+  'Türkçe / Türk Dili ve Edebiyatı', 'Matematik / Geometri', 'Fen Bilimleri', 'Sosyal Bilgiler',
+  'Tarih', 'Coğrafya', 'Felsefe', 'Fizik', 'Kimya', 'Biyoloji',
+  'Din Kültürü ve Ahlak Bilgisi', 'İngilizce', 'T.C. İnkılap Tarihi ve Atatürkçülük', 'Hayat Bilgisi', 'Diğer',
+];
+const INSTITUTION_LEVELS = ['İlkokul', 'Ortaokul', 'Lise', 'Kurs'];
+
 function RegisterPage() {
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -271,6 +278,20 @@ function RegisterPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [accountType, setAccountType] = useState('teacher'); // 'teacher' | 'kurum'
+  const [mainBranch, setMainBranch] = useState('');
+  const [secondaryBranch, setSecondaryBranch] = useState('');
+  const [institutionLevels, setInstitutionLevels] = useState([]);
+
+  const toggleLevel = (level) => {
+    setInstitutionLevels((prev) => {
+      const has = prev.includes(level);
+      if (has) return prev.filter((l) => l !== level);
+      if (prev.includes('Kurs') || level === 'Kurs') return [...prev, level];
+      return [level];
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,12 +305,29 @@ function RegisterPage() {
       setError('Şifre en az 6 karakter olmalıdır.');
       return;
     }
+    if (accountType === 'teacher' && !mainBranch) {
+      setError('Lütfen ana branşınızı seçin.');
+      return;
+    }
+    if (accountType === 'teacher' && institutionLevels.length === 0) {
+      setError('Lütfen okul kademenizi seçin.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const response = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password, fullName: fullName.trim(), role: 'teacher' }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          fullName: fullName.trim(),
+          role: 'teacher',
+          accountType,
+          mainBranch: accountType === 'teacher' ? mainBranch : undefined,
+          secondaryBranch: accountType === 'teacher' ? secondaryBranch || undefined : undefined,
+          institutionLevels: accountType === 'teacher' ? institutionLevels : undefined,
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -318,6 +356,31 @@ function RegisterPage() {
       )}
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
+          <label className={`block mb-2 ${textMuted(theme)}`}>Hesap Türü</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAccountType('teacher')}
+              className={`flex-1 py-2 rounded-lg border ${accountType === 'teacher' ? 'bg-blue-600 text-white border-blue-600' : `${inputBg(theme)}`}`}
+            >
+              Öğretmen
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountType('kurum')}
+              className={`flex-1 py-2 rounded-lg border ${accountType === 'kurum' ? 'bg-blue-600 text-white border-blue-600' : `${inputBg(theme)}`}`}
+            >
+              Kurum (Okul/Kurs)
+            </button>
+          </div>
+          {accountType === 'kurum' && (
+            <p className={`text-xs mt-2 ${textMuted(theme)}`}>
+              Kurum hesapları TYT/AYT/LGS denemesi hazırlayabilir ve kendi öğretmen/öğrencilerinin trafiğini görebilir.
+            </p>
+          )}
+        </div>
+
+        <div className="mb-4">
           <label className={`block mb-2 ${textMuted(theme)}`}>Ad Soyad</label>
           <input
             type="text"
@@ -344,6 +407,58 @@ function RegisterPage() {
             className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg(theme)}`}
           />
         </div>
+
+        {accountType === 'teacher' && (
+          <>
+            <div className="mb-4">
+              <label className={`block mb-2 ${textMuted(theme)}`}>Ana Branş</label>
+              <div className="flex flex-wrap gap-2">
+                {MAIN_BRANCHES.map((b) => (
+                  <button
+                    type="button"
+                    key={b}
+                    onClick={() => setMainBranch(b)}
+                    className={`px-3 py-1.5 rounded-full text-sm border ${mainBranch === b ? 'bg-blue-600 text-white border-blue-600' : `${inputBg(theme)}`}`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className={`block mb-2 ${textMuted(theme)}`}>Yan Branş (isteğe bağlı)</label>
+              <div className="flex flex-wrap gap-2">
+                {MAIN_BRANCHES.filter((b) => b !== mainBranch).map((b) => (
+                  <button
+                    type="button"
+                    key={b}
+                    onClick={() => setSecondaryBranch(secondaryBranch === b ? '' : b)}
+                    className={`px-3 py-1.5 rounded-full text-sm border ${secondaryBranch === b ? 'bg-blue-600 text-white border-blue-600' : `${inputBg(theme)}`}`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-6">
+              <label className={`block mb-2 ${textMuted(theme)}`}>Okul Kademesi</label>
+              <p className={`text-xs mb-2 ${textMuted(theme)}`}>"Kurs" seçerseniz birden fazla kademe seçebilirsiniz.</p>
+              <div className="flex flex-wrap gap-2">
+                {INSTITUTION_LEVELS.map((lvl) => (
+                  <button
+                    type="button"
+                    key={lvl}
+                    onClick={() => toggleLevel(lvl)}
+                    className={`px-3 py-1.5 rounded-full text-sm border ${institutionLevels.includes(lvl) ? 'bg-blue-600 text-white border-blue-600' : `${inputBg(theme)}`}`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
         <button
           type="submit"
           disabled={isSubmitting}
