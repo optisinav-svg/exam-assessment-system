@@ -20,6 +20,7 @@ import studentRoutes from './routes/student.routes';
 import subjectRoutes from './routes/subject.routes';
 import learningOutcomesRoutes from './routes/learning-outcomes.routes';
 import institutionRoutes from './routes/institution.routes';
+import opticalTemplatesRouter from './routes/optical-templates.routes';
 import { verifyToken } from './middleware/auth.middleware';
 import { seedKazanimlar } from './seed-kazanimlar';
 import { runSafeMigrations } from './safe-migrations';
@@ -70,6 +71,7 @@ app.use('/api/students', verifyToken, studentRoutes); // Öğrenci onay/listelem
 app.use('/api/subjects', verifyToken, subjectRoutes); // Dersler - giriş gerektirir
 app.use('/api/learning-outcomes', verifyToken, learningOutcomesRoutes); // Kazanım yönetimi - giriş gerektirir
 app.use('/api/institution', verifyToken, institutionRoutes); // Kurum paneli yönetimi - kurum hesabı gerektirir
+app.use('/api/optical-templates', verifyToken, opticalTemplatesRouter); // Optik şablon yönetimi - giriş gerektirir
 
 // Global hata yakalama
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -123,6 +123,7 @@ function AppRoutes() {
         <Route path="/outcomes" element={<OutcomesPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/institution" element={<InstitutionPage />} />
+        <Route path="/optical-templates" element={<OpticalTemplatesPage />} />
         <Route path="/storage" element={<StoragePage />} />
         <Route path="/pricing" element={<PricingPage />} />
       </Routes>
@@ -558,6 +559,9 @@ function DashboardPage() {
           </a>
           <a href="/admin" className={`px-3 py-2 rounded-lg text-sm ${bgCard(theme)} ${textMuted(theme)} border ${borderColor(theme)} hover:bg-blue-50`}>
             ⚙️ Admin
+          </a>
+          <a href="/optical-templates" className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+            🖨️ Optik Şablonlar
           </a>
           {JSON.parse(localStorage.getItem('optiksinav-user') || '{}').accountType === 'kurum' && (
             <a href="/institution" className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
@@ -4992,3 +4996,609 @@ function PricingPage() {
 }
 
 export default App;
+
+// ─── Optik Şablon Tanımlama Ekranı (Optik Şablonlarım) ───────────────────────
+function OpticalTemplatesPage() {
+  const { theme } = useTheme();
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Oluşturma / Düzenleme Modu
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [name, setName] = useState('');
+  const [templateType, setTemplateType] = useState<'4_choice' | '5_choice'>('5_choice');
+  const [previewImage, setPreviewImage] = useState<string>('');
+  const [imageWidth, setImageWidth] = useState(1200);
+  const [imageHeight, setImageHeight] = useState(1600);
+
+  // İşaretlenen Alanlar
+  const [corners, setCorners] = useState<{ x: number; y: number }[] | null>(null);
+  const [nameBlock, setNameBlock] = useState<any>(null);
+  const [studentNoBlock, setStudentNoBlock] = useState<any>(null);
+  const [answerBlocks, setAnswerBlocks] = useState<any[]>([]);
+
+  // Aktif Çizim / İşaretleme Modu
+  const [activeTool, setActiveTool] = useState<'none' | 'name' | 'studentNo' | 'answer' | 'corners'>('none');
+  const [drawingStart, setDrawingStart] = useState<{ x: number; y: number } | null>(null);
+  const [tempRect, setTempRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [tempCorners, setTempCorners] = useState<{ x: number; y: number }[]>([]);
+
+  // Cevap Alanı Ek Modal / Form Parametreleri
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
+  const [pendingAnswerRect, setPendingAnswerRect] = useState<any>(null);
+  const [subjectLabel, setSubjectLabel] = useState('Türkçe');
+  const [startQuestion, setStartQuestion] = useState(1);
+  const [questionCount, setQuestionCount] = useState(20);
+  const [optionCount, setOptionCount] = useState(5);
+
+  const token = localStorage.getItem('optiksinav-token') || '';
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/optical-templates`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data.templates || data || []);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || 'Şablonlar yüklenemedi.');
+      }
+    } catch (err: any) {
+      setError('Sunucu bağlantı hatası.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartNew = () => {
+    setIsEditing(true);
+    setEditingId(null);
+    setName('');
+    setTemplateType('5_choice');
+    setPreviewImage('');
+    setCorners(null);
+    setNameBlock(null);
+    setStudentNoBlock(null);
+    setAnswerBlocks([]);
+    setActiveTool('none');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleEditTemplate = (tmpl: any) => {
+    setIsEditing(true);
+    setEditingId(tmpl.id);
+    setName(tmpl.name);
+    setTemplateType(tmpl.type || '5_choice');
+    setPreviewImage(tmpl.previewImage || '');
+    const fields = tmpl.fields || {};
+    setImageWidth(fields.imageWidth || 1200);
+    setImageHeight(fields.imageHeight || 1600);
+    setCorners(fields.corners || null);
+    setNameBlock(fields.nameBlock || null);
+    setStudentNoBlock(fields.studentNoBlock || null);
+    setAnswerBlocks(fields.answerBlocks || []);
+    setActiveTool('none');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleDeleteTemplate = async (id: number) => {
+    if (!confirm('Bu optik şablonunu silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/optical-templates/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      });
+      if (res.ok) {
+        setSuccess('Şablon başarıyla silindi.');
+        fetchTemplates();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || 'Silinemedi.');
+      }
+    } catch (err) {
+      setError('Bağlantı hatası.');
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setPreviewImage(base64);
+
+      // Boyut tespiti için Image yükle
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => {
+        setImageWidth(img.width || 1200);
+        setImageHeight(img.height || 1600);
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Görsel Üzerinde Fare İşaretleme Olayları
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeTool === 'none' || activeTool === 'corners') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * imageWidth);
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * imageHeight);
+
+    setDrawingStart({ x, y });
+    setTempRect({ x, y, width: 0, height: 0 });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!drawingStart || activeTool === 'none' || activeTool === 'corners') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const currentX = Math.round(((e.clientX - rect.left) / rect.width) * imageWidth);
+    const currentY = Math.round(((e.clientY - rect.top) / rect.height) * imageHeight);
+
+    const x = Math.min(drawingStart.x, currentX);
+    const y = Math.min(drawingStart.y, currentY);
+    const width = Math.abs(currentX - drawingStart.x);
+    const height = Math.abs(currentY - drawingStart.y);
+
+    setTempRect({ x, y, width, height });
+  };
+
+  const handleMouseUp = () => {
+    if (!drawingStart || !tempRect || tempRect.width < 10 || tempRect.height < 10) {
+      setDrawingStart(null);
+      setTempRect(null);
+      return;
+    }
+
+    if (activeTool === 'name') {
+      setNameBlock({ ...tempRect, rows: 26, cols: 15 });
+    } else if (activeTool === 'studentNo') {
+      setStudentNoBlock({ ...tempRect, rows: 10, cols: 6 });
+    } else if (activeTool === 'answer') {
+      setPendingAnswerRect(tempRect);
+      setShowAnswerModal(true);
+    }
+
+    setDrawingStart(null);
+    setTempRect(null);
+    setActiveTool('none');
+  };
+
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeTool !== 'corners') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * imageWidth);
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * imageHeight);
+
+    const updated = [...tempCorners, { x, y }];
+    setTempCorners(updated);
+    if (updated.length === 4) {
+      setCorners(updated);
+      setTempCorners([]);
+      setActiveTool('none');
+    }
+  };
+
+  const handleSaveAnswerBlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingAnswerRect) return;
+
+    const newBlock = {
+      subjectLabel,
+      startQuestion: Number(startQuestion),
+      questionCount: Number(questionCount),
+      optionCount: Number(optionCount),
+      ...pendingAnswerRect,
+    };
+
+    setAnswerBlocks([...answerBlocks, newBlock]);
+    setShowAnswerModal(false);
+    setPendingAnswerRect(null);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!name.trim()) {
+      setError('Lütfen şablon adını girin.');
+      return;
+    }
+    if (!previewImage) {
+      setError('Lütfen boş optik form görseli yükleyin.');
+      return;
+    }
+
+    const fields = {
+      imageWidth,
+      imageHeight,
+      corners,
+      nameBlock,
+      studentNoBlock,
+      answerBlocks,
+    };
+
+    const payload = {
+      name: name.trim(),
+      type: templateType,
+      fields,
+      previewImage,
+    };
+
+    try {
+      const url = editingId ? `${API_BASE}/optical-templates/${editingId}` : `${API_BASE}/optical-templates`;
+      const method = editingId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setSuccess('Şablon başarıyla kaydedildi!');
+        setIsEditing(false);
+        fetchTemplates();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || 'Şablon kaydedilemedi.');
+      }
+    } catch (err) {
+      setError('Sunucu bağlantı hatası.');
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto transition-colors duration-300">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className={`text-2xl font-bold ${textPrimary(theme)}`}>🖨️ Optik Şablonlarım</h1>
+          <p className={`text-sm mt-1 ${textSecondary(theme)}`}>Farklı yayıncılara ait optik formları kamerayla okutmak için tanımlayın ve yönetin.</p>
+        </div>
+        <div className="flex gap-2">
+          <a href="/dashboard" className={`px-4 py-2 rounded-lg text-sm border ${bgCard(theme)} ${textMuted(theme)} ${borderColor(theme)} hover:border-blue-400`}>← Dashboard</a>
+          {!isEditing && (
+            <button onClick={handleStartNew} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 font-medium">
+              + Yeni Şablon Tanımla
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">⚠️ {error}</div>}
+      {success && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">✅ {success}</div>}
+
+      {/* Şablon Düzenleme / Oluşturma Görünümü */}
+      {isEditing ? (
+        <div className={`p-6 rounded-xl shadow-sm border ${bgCard(theme)} ${borderColor(theme)} mb-8`}>
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 className={`text-lg font-bold ${textPrimary(theme)}`}>
+              {editingId ? 'Optik Şablonu Düzenle' : 'Yeni Optik Şablon Tanımla'}
+            </h2>
+            <button onClick={() => setIsEditing(false)} className={`text-sm ${textSecondary(theme)} hover:underline`}>İptal</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <label className={`block text-sm mb-2 ${textMuted(theme)}`}>Şablon Adı / Yayıncı (örn. Ödevşat 5'li)</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Örn: Ödevşat TYT Optik"
+                className={`w-full px-3 py-2 border rounded-lg ${inputBg(theme)}`}
+              />
+            </div>
+            <div>
+              <label className={`block text-sm mb-2 ${textMuted(theme)}`}>Şablon Türü</label>
+              <select
+                value={templateType}
+                onChange={(e) => setTemplateType(e.target.value as any)}
+                className={`w-full px-3 py-2 border rounded-lg ${inputBg(theme)}`}
+              >
+                <option value="5_choice">5 Seçenekli (A B C D E)</option>
+                <option value="4_choice">4 Seçenekli (A B C D)</option>
+              </select>
+            </div>
+            <div>
+              <label className={`block text-sm mb-2 ${textMuted(theme)}`}>Boş Form Fotoğrafı</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className={`w-full text-sm ${textSecondary(theme)} file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100`}
+              />
+            </div>
+          </div>
+
+          {/* Görsel ve İşaretleme Alanı */}
+          {previewImage ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
+                <span className={`text-sm font-semibold ${textPrimary(theme)}`}>İşaretleme Araçları:</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('name')}
+                  className={`px-3 py-1.5 rounded text-xs font-medium ${activeTool === 'name' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                >
+                  {nameBlock ? '✓ İsim Alanı (Eklendi)' : '+ İsim Alanı Çiz'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('studentNo')}
+                  className={`px-3 py-1.5 rounded text-xs font-medium ${activeTool === 'studentNo' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                >
+                  {studentNoBlock ? '✓ Öğrenci No (Eklendi)' : '+ Öğrenci No Alanı Çiz'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('answer')}
+                  className={`px-3 py-1.5 rounded text-xs font-medium ${activeTool === 'answer' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                >
+                  + Cevap Alanı Çiz ({answerBlocks.length} ders)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTool('corners'); setTempCorners([]); }}
+                  className={`px-3 py-1.5 rounded text-xs font-medium ${activeTool === 'corners' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                >
+                  {corners ? '✓ 4 Köşe İşaretli' : `+ 4 Köşe İşaretle (${tempCorners.length}/4)`}
+                </button>
+
+                {activeTool !== 'none' && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 ml-auto font-medium">
+                    {activeTool === 'corners' ? 'Formun 4 köşesine sırasıyla tıklayın (Sol-Üst, Sağ-Üst, Sağ-Alt, Sol-Alt)' : 'Fotoğraf üzerinde fare ile tıklayıp sürükleyerek dikdörtgen çizin.'}
+                  </span>
+                )}
+              </div>
+
+              {/* Görsel Konteyner */}
+              <div
+                className="relative inline-block border-2 border-dashed border-purple-400 rounded-lg overflow-hidden max-w-full cursor-crosshair select-none bg-black/10"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onClick={handleImageClick}
+              >
+                <img src={previewImage} alt="Optik Form" className="block max-w-full h-auto pointer-events-none" />
+
+                {/* SVG Overlay for bounding boxes */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Name Block */}
+                  {nameBlock && (
+                    <div
+                      className="absolute border-2 border-blue-500 bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-900 dark:text-blue-200"
+                      style={{
+                        left: `${(nameBlock.x / imageWidth) * 100}%`,
+                        top: `${(nameBlock.y / imageHeight) * 100}%`,
+                        width: `${(nameBlock.width / imageWidth) * 100}%`,
+                        height: `${(nameBlock.height / imageHeight) * 100}%`,
+                      }}
+                    >
+                      İsim Alanı
+                    </div>
+                  )}
+
+                  {/* Student No Block */}
+                  {studentNoBlock && (
+                    <div
+                      className="absolute border-2 border-purple-500 bg-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-900 dark:text-purple-200"
+                      style={{
+                        left: `${(studentNoBlock.x / imageWidth) * 100}%`,
+                        top: `${(studentNoBlock.y / imageHeight) * 100}%`,
+                        width: `${(studentNoBlock.width / imageWidth) * 100}%`,
+                        height: `${(studentNoBlock.height / imageHeight) * 100}%`,
+                      }}
+                    >
+                      Öğrenci No
+                    </div>
+                  )}
+
+                  {/* Answer Blocks */}
+                  {answerBlocks.map((b, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute border-2 border-green-500 bg-green-500/20 flex items-center justify-center text-xs font-bold text-green-900 dark:text-green-200"
+                      style={{
+                        left: `${(b.x / imageWidth) * 100}%`,
+                        top: `${(b.y / imageHeight) * 100}%`,
+                        width: `${(b.width / imageWidth) * 100}%`,
+                        height: `${(b.height / imageHeight) * 100}%`,
+                      }}
+                    >
+                      {b.subjectLabel} ({b.startQuestion}-{b.startQuestion + b.questionCount - 1})
+                    </div>
+                  ))}
+
+                  {/* Temp Drawing Rect */}
+                  {tempRect && (
+                    <div
+                      className="absolute border-2 border-dashed border-red-500 bg-red-500/30"
+                      style={{
+                        left: `${(tempRect.x / imageWidth) * 100}%`,
+                        top: `${(tempRect.y / imageHeight) * 100}%`,
+                        width: `${(tempRect.width / imageWidth) * 100}%`,
+                        height: `${(tempRect.height / imageHeight) * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Alanları Sıfırlama */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setNameBlock(null); setStudentNoBlock(null); setAnswerBlocks([]); setCorners(null); }}
+                  className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 font-medium"
+                >
+                  Tüm İşaretlemeleri Temizle
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={`p-12 text-center rounded-lg border border-dashed ${borderColor(theme)} ${textSecondary(theme)}`}>
+              Lütfen yukarıdan boş bir optik form fotoğrafı seçin.
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setIsEditing(false)}
+              className={`px-4 py-2 rounded-lg border text-sm ${borderColor(theme)} ${textMuted(theme)}`}
+            >
+              Vazgeç
+            </button>
+            <button
+              onClick={handleSaveTemplate}
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 font-medium"
+            >
+              Şablonu Kaydet
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Şablon Listesi */}
+      <div className={`rounded-xl shadow-sm border overflow-hidden ${bgCard(theme)} ${borderColor(theme)}`}>
+        <div className={`px-5 py-4 border-b ${borderColor2(theme)} flex items-center justify-between`}>
+          <h2 className={`font-semibold ${textPrimary(theme)}`}>Kayıtlı Optik Şablonlar</h2>
+          <span className={`text-xs ${textSecondary(theme)}`}>{templates.length} şablon bulundu</span>
+        </div>
+
+        {loading ? (
+          <div className="p-12 text-center"><p className={textSecondary(theme)}>Yükleniyor...</p></div>
+        ) : templates.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className={textSecondary(theme)}>Henüz kayıtlı optik şablonunuz yok.</p>
+            <p className={`text-xs mt-1 ${textMuted(theme)}`}>"+ Yeni Şablon Tanımla" butonuna basarak ilk şablonunuzu ekleyin.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
+            {templates.map((tmpl: any) => {
+              const fields = tmpl.fields || {};
+              const answerCount = fields.answerBlocks?.length || 0;
+              return (
+                <div key={tmpl.id} className={`p-4 rounded-xl border flex flex-col justify-between ${bgCard(theme)} ${borderColor(theme)}`}>
+                  <div>
+                    {tmpl.previewImage && (
+                      <div className="mb-3 h-40 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center border">
+                        <img src={tmpl.previewImage} alt={tmpl.name} className="max-h-full max-w-full object-contain" />
+                      </div>
+                    )}
+                    <h3 className={`font-bold text-base ${textPrimary(theme)}`}>{tmpl.name}</h3>
+                    <div className="flex gap-2 mt-2">
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded text-xs font-medium">
+                        {tmpl.type === '4_choice' ? '4 Seçenekli' : '5 Seçenekli'}
+                      </span>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 rounded text-xs font-medium">
+                        {answerCount} Ders Alanı
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <button
+                      onClick={() => handleEditTemplate(tmpl)}
+                      className="px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded text-xs font-medium hover:bg-blue-100"
+                    >
+                      Düzenle
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTemplate(tmpl.id)}
+                      className="px-3 py-1.5 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 rounded text-xs font-medium hover:bg-red-100"
+                    >
+                      Sil
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Cevap Alanı Ekleme Modal */}
+      {showAnswerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`w-full max-w-md p-6 rounded-xl shadow-lg border ${bgCard(theme)} ${borderColor(theme)}`}>
+            <h3 className={`text-lg font-bold mb-4 ${textPrimary(theme)}`}>Cevap Alanı Detayları</h3>
+            <form onSubmit={handleSaveAnswerBlock}>
+              <div className="mb-4">
+                <label className={`block text-sm mb-1 ${textMuted(theme)}`}>Ders Adı</label>
+                <input
+                  type="text"
+                  value={subjectLabel}
+                  onChange={(e) => setSubjectLabel(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg ${inputBg(theme)}`}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted(theme)}`}>Kaçıncı Sorudan Başlıyor?</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={startQuestion}
+                    onChange={(e) => setStartQuestion(Number(e.target.value))}
+                    className={`w-full px-3 py-2 border rounded-lg ${inputBg(theme)}`}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm mb-1 ${textMuted(theme)}`}>Toplam Soru Sayısı</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={questionCount}
+                    onChange={(e) => setQuestionCount(Number(e.target.value))}
+                    className={`w-full px-3 py-2 border rounded-lg ${inputBg(theme)}`}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="mb-6">
+                <label className={`block text-sm mb-1 ${textMuted(theme)}`}>Seçenek Sayısı</label>
+                <select
+                  value={optionCount}
+                  onChange={(e) => setOptionCount(Number(e.target.value))}
+                  className={`w-full px-3 py-2 border rounded-lg ${inputBg(theme)}`}
+                >
+                  <option value={5}>5 Seçenek (A B C D E)</option>
+                  <option value={4}>4 Seçenek (A B C D)</option>
+                  <option value={3}>3 Seçenek</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAnswerModal(false)}
+                  className={`px-4 py-2 rounded-lg border text-sm ${borderColor(theme)} ${textMuted(theme)}`}
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 font-medium"
+                >
+                  Ekle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
