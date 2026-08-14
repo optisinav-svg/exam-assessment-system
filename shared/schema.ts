@@ -231,3 +231,15 @@ export const whatsappLogs = pgTable('whatsapp_logs', {
   sentAt: timestamp('sent_at'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// Kurum Üyeleri ve Davetleri
+export const institutionMembers = pgTable('institution_members', {
+  id: serial('id').primaryKey(),
+  institutionUserId: integer('institution_user_id').references(() => users.id).notNull(), // kurum hesabının id'si
+  memberUserId: integer('member_user_id').references(() => users.id), // eğer üye bir öğretmense
+  memberStudentId: integer('member_student_id').references(() => students.id), // eğer üye bir öğrenciyse
+  role: varchar('role', { length: 20 }), // 'teacher' | 'student'
+  status: varchar('status', { length: 20 }).default('active'), // 'active' | 'pending'
+  email: varchar('email', { length: 255 }), // davet edilen e-posta
+  joinedAt: timestamp('joined_at').defaultNow(),
+});
