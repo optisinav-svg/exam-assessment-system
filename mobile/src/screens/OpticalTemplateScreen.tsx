@@ -19,7 +19,7 @@ import api from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
 export default function OpticalTemplateScreen({ navigation }: any) {
-  const { colors, isDark } = useTheme();
+  const { colors, mode } = useTheme();
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -287,7 +287,7 @@ export default function OpticalTemplateScreen({ navigation }: any) {
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Şablon Adı</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
+              style={[styles.input, { backgroundColor: mode === 'dark' ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
               value={name}
               onChangeText={setName}
               placeholder="Örn: TYT Optik Formu"
@@ -500,14 +500,14 @@ export default function OpticalTemplateScreen({ navigation }: any) {
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Ders Adı</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
+              style={[styles.input, { backgroundColor: mode === 'dark' ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
               value={subjectLabel}
               onChangeText={setSubjectLabel}
             />
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Başlangıç Soru No</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
+              style={[styles.input, { backgroundColor: mode === 'dark' ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
               value={String(startQuestion)}
               onChangeText={(v) => setStartQuestion(Number(v))}
               keyboardType="numeric"
@@ -515,7 +515,7 @@ export default function OpticalTemplateScreen({ navigation }: any) {
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Toplam Soru Sayısı</Text>
             <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
+              style={[styles.input, { backgroundColor: mode === 'dark' ? '#374151' : '#F9FAFB', color: colors.text, borderColor: colors.border }]}
               value={String(questionCount)}
               onChangeText={(v) => setQuestionCount(Number(v))}
               keyboardType="numeric"

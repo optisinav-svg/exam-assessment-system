@@ -21,6 +21,13 @@ import CreateExamScreen from './screens/CreateExamScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OpticalTemplateScreen from './screens/OpticalTemplateScreen';
 import SubscriptionScreen from './screens/SubscriptionScreen';
+import PuanHesaplamaScreen from './screens/PuanHesaplamaScreen';
+import KazanimYonetimiScreen from './screens/KazanimYonetimiScreen';
+import DashboardScreen from './screens/DashboardScreen';
+import KurumPaneliScreen from './screens/KurumPaneliScreen';
+import PuanKatsayilariScreen from './screens/PuanKatsayilariScreen';
+import DosyalarimScreen from './screens/DosyalarimScreen';
+import FiyatlandirmaScreen from './screens/FiyatlandirmaScreen';
 import { getExams, Exam } from './services/api';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -109,6 +116,37 @@ function HomeScreen({ navigation }: any) {
           >
             <Text style={styles.menuIcon}>💎</Text>
             <Text style={[styles.menuText, { color: colors.text }]}>Abonelik</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('PuanHesaplama')}>
+            <Text style={styles.menuIcon}>🧮</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Puan{ '\\n' }Hesaplama</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('KazanimYonetimi')}>
+            <Text style={styles.menuIcon}>🎯</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Kazanım{ '\\n' }Yönetimi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('Dashboard')}>
+            <Text style={styles.menuIcon}>📊</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Genel{ '\\n' }Bakış</Text>
+          </TouchableOpacity>
+          {user?.accountType === 'kurum' && (
+            <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('KurumPaneli')}>
+              <Text style={styles.menuIcon}>🏫</Text>
+              <Text style={[styles.menuText, { color: colors.text }]}>Kurum{ '\\n' }Paneli</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('PuanKatsayilari')}>
+            <Text style={styles.menuIcon}>📐</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Puan{ '\\n' }Katsayıları</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('Dosyalarim')}>
+            <Text style={styles.menuIcon}>🗂️</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Dosyalarım</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.card }]} onPress={() => navigation.navigate('Fiyatlandirma')}>
+            <Text style={styles.menuIcon}>💳</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Fiyatlandırma</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -254,6 +292,13 @@ function MainNavigator() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="OpticalTemplate" component={OpticalTemplateScreen} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+      <Stack.Screen name="PuanHesaplama" component={PuanHesaplamaScreen} />
+      <Stack.Screen name="KazanimYonetimi" component={KazanimYonetimiScreen} />
+      <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="KurumPaneli" component={KurumPaneliScreen} />
+      <Stack.Screen name="PuanKatsayilari" component={PuanKatsayilariScreen} />
+      <Stack.Screen name="Dosyalarim" component={DosyalarimScreen} />
+      <Stack.Screen name="Fiyatlandirma" component={FiyatlandirmaScreen} />
     </Stack.Navigator>
   );
 }

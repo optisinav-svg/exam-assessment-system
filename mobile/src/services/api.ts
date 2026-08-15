@@ -326,3 +326,224 @@ export async function updateExam(id: number, input: Partial<CreateExamInput>) {
   const { data } = await api.put<Exam>(`/exams/${id}`, input);
   return data;
 }
+
+
+// ─── Mobil web ekranları: puan, kazanım, dashboard, kurum ve depolama ─────────
+
+export interface ScoreCoefficient {
+  id: number;
+  examType: string;
+  year: number;
+  subjectCode: string;
+  average: string | number | null;
+  stdDeviation: string | number | null;
+  coefficient: string | number | null;
+}
+
+export async function getScoreCoefficients(examType: string, year: number) {
+  const { data } = await api.get<{ success: boolean; coefficients: ScoreCoefficient[]; total: number }>(
+    `/score-coefficients?examType=${encodeURIComponent(examType)}&year=${year}`
+  );
+  return data;
+}
+
+export async function saveScoreCoefficientsBulk(input: {
+  examType: string;
+  year: number;
+  items: Array<{ subjectCode: string; average?: number; stdDeviation?: number; coefficient?: number }>;
+}) {
+  const { data } = await api.post('/score-coefficients/bulk', input);
+  return data;
+}
+
+export async function deleteScoreCoefficient(id: number) {
+  const { data } = await api.delete(`/score-coefficients/${id}`);
+  return data;
+}
+
+export interface LearningOutcomeSubject {
+  id: number;
+  name: string;
+  code?: string | null;
+  color?: string | null;
+  teacherId?: number | null;
+}
+
+export async function getLearningOutcomeSubjects() {
+  const { data } = await api.get<{
+    success: boolean;
+    userSubjects: LearningOutcomeSubject[];
+    globalSubjects: LearningOutcomeSubject[];
+  }>('/learning-outcomes/subjects');
+  return data;
+}
+
+export async function getLearningOutcomes(
+  subjectId: number,
+  options: { page?: number; pageSize?: number; gradeLevel?: string } = {}
+) {
+  const params = new URLSearchParams();
+  params.set('page', String(options.page || 1));
+  params.set('pageSize', String(options.pageSize || 50));
+  if (options.gradeLevel) params.set('gradeLevel', options.gradeLevel);
+  const { data } = await api.get<{
+    success: boolean;
+    outcomes: LearningOutcome[];
+    pagination: { page: number; pageSize: number; total: number; totalPages: number };
+  }>(`/learning-outcomes/${subjectId}?${params.toString()}`);
+  return data;
+}
+
+export async function searchLearningOutcomesManagement(subjectId: number, query: string) {
+  const { data } = await api.get<{ success: boolean; outcomes: LearningOutcome[]; total: number }>(
+    `/learning-outcomes/search/${subjectId}?q=${encodeURIComponent(query)}`
+  );
+  return data;
+}
+
+export async function createLearningOutcome(
+  subjectId: number,
+  input: { code: string; description: string; gradeLevel?: string }
+) {
+  const { data } = await api.post(`/learning-outcomes/${subjectId}`, input);
+  return data;
+}
+
+export async function updateLearningOutcome(
+  id: number,
+  input: { code?: string; description?: string; gradeLevel?: string }
+) {
+  const { data } = await api.put(`/learning-outcomes/outcome/${id}`, input);
+  return data;
+}
+
+export async function deleteLearningOutcome(id: number) {
+  const { data } = await api.delete(`/learning-outcomes/outcome/${id}`);
+  return data;
+}
+
+export interface DashboardSummary {
+  totalExams: number;
+  totalStudents: number;
+  totalSubjects: number;
+  avgScore: number;
+}
+
+export async function getDashboardData() {
+  const { data } = await api.get<{
+    success?: boolean;
+    summary: DashboardSummary;
+    examTrend: Array<{ examId: number; name: string; date: string; studentCount: number; avgNet: number; avgScore: number }>;
+    answerDistribution?: Array<{ answer: string; count: number }>;
+    recentExams: Array<{ id: number; title: string; examDate: string; status: string }>;
+  }>('/analytics/dashboard');
+  return data;
+}
+
+export interface InstitutionMember {
+  id: number;
+  role: 'teacher' | 'student';
+  status: 'active' | 'pending';
+  email: string;
+  joinedAt?: string | null;
+  details?: {
+    id: number;
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    mainBranch?: string | null;
+    studentNo?: string | null;
+  } | null;
+}
+
+export async function getInstitutionMembers() {
+  const { data } = await api.get<{ success: boolean; members: InstitutionMember[]; total: number }>('/institution/members');
+  return data;
+}
+
+export async function getInstitutionStats() {
+  const { data } = await api.get<{ success: boolean; stats: { teacherCount: number; studentCount: number; totalExams: number; totalMembers: number } }>('/institution/stats');
+  return data;
+}
+
+export async function inviteInstitutionMember(email: string, role: 'teacher' | 'student') {
+  const { data } = await api.post('/institution/invite', { email, role });
+  return data;
+}
+
+export interface StoredFile {
+  id: number;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  formattedSize?: string;
+  category?: string | null;
+  isPublic?: boolean;
+  createdAt: string;
+  downloadUrl?: string;
+}
+
+export async function getStoredFiles() {
+  const { data } = await api.get<{ total: number; files: StoredFile[] }>('/storage/list');
+  return data;
+}
+
+export async function getStorageStats() {
+  const { data } = await api.get<{
+    totalFiles: number;
+    totalSizeBytes: number;
+    totalSizeFormatted: string;
+    byCategory: Record<string, number>;
+    recentFiles: StoredFile[];
+  }>('/storage/stats');
+  return data;
+}
+
+export async function uploadStoredFile(uri: string, name: string, type: string, category?: string) {
+  const formData = new FormData();
+  formData.append('file', { uri, name, type } as any);
+  if (category) formData.append('category', category);
+  const { data } = await api.post('/storage/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function deleteStoredFile(id: number) {
+  const { data } = await api.delete(`/storage/${id}`);
+  return data;
+}
+
+export function getStorageDownloadUrl(id: number) {
+  return `${API_BASE_URL}/storage/download/${id}`;
+}
+
+export async function getResultAnalytics(examId: number) {
+  const { data } = await api.get(`/analytics/exam/${examId}`);
+  return data;
+}
+
+export async function getStudentCountForClass(classId: number) {
+  const { data } = await api.get<{ success: boolean; students: any[]; total: number }>(
+    `/roster/classes/${classId}/students`
+  );
+  return data;
+}
+
+export async function getScoreCoefficientYears(examType: string, years: number[]) {
+  const results = await Promise.all(years.map((year) => getScoreCoefficients(examType, year)));
+  return results.map((result, index) => ({ year: years[index], ...result }));
+}
+
+export async function getPricingPlans() {
+  return [
+    { id: 'ogrenci', name: 'Öğrenci', price: 69, suffix: 'aylık', features: ['Sınırsız sınav analizi', 'Kazanım takibi', 'Gelişim raporları'] },
+    { id: 'ogretmen', name: 'Öğretmen', price: 149, suffix: 'aylık', features: ['Optik form okuma', 'Sınıf yönetimi', 'Gelişmiş istatistikler'] },
+    { id: 'kurum', name: 'Kurum', price: 19, suffix: 'öğrenci / ay', features: ['Kurum paneli', 'Toplu kullanıcı yönetimi', 'Şube karşılaştırmaları'] },
+    { id: 'koc', name: 'Eğitim Koçu', price: 24, suffix: 'öğrenci / ay', features: ['Öğrenci takibi', 'Koçluk raporları', 'Ödev takip sistemi'] },
+  ];
+}
+
+export default api;

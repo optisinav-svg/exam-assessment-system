@@ -22,7 +22,7 @@ const PLANS = [
 ];
 
 export default function SubscriptionScreen({ navigation }: any) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [currentSub, setCurrentSub] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
