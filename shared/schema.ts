@@ -243,3 +243,16 @@ export const institutionMembers = pgTable('institution_members', {
   email: varchar('email', { length: 255 }), // davet edilen e-posta
   joinedAt: timestamp('joined_at').defaultNow(),
 });
+
+// Abonelikler tablosu (Iyzico entegrasyonu)
+export const subscriptions = pgTable('subscriptions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  studentId: integer('student_id').references(() => students.id),
+  plan: varchar('plan', { length: 30 }), // 'ogrenci' | 'ogretmen' | 'kurum' | 'koc'
+  status: varchar('status', { length: 20 }).default('trial'), // trial | active | expired | cancelled
+  iyzicoSubscriptionId: varchar('iyzico_subscription_id', { length: 255 }),
+  trialEndsAt: timestamp('trial_ends_at'),
+  currentPeriodEnd: timestamp('current_period_end'),
+  createdAt: timestamp('created_at').defaultNow(),
+});

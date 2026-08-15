@@ -19,6 +19,8 @@ import StudentRegisterScreen from './screens/StudentRegisterScreen';
 import PendingStudentsScreen from './screens/PendingStudentsScreen';
 import CreateExamScreen from './screens/CreateExamScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import OpticalTemplateScreen from './screens/OpticalTemplateScreen';
+import SubscriptionScreen from './screens/SubscriptionScreen';
 import { getExams, Exam } from './services/api';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -87,10 +89,26 @@ function HomeScreen({ navigation }: any) {
 
           <TouchableOpacity
             style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => navigation.navigate('OpticalTemplate')}
+          >
+            <Text style={styles.menuIcon}>🖨️</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Optik{'\n'}Şablonlar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
             onPress={() => navigation.navigate('Profile')}
           >
             <Text style={styles.menuIcon}>👤</Text>
             <Text style={[styles.menuText, { color: colors.text }]}>Profil</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, { backgroundColor: colors.card }]}
+            onPress={() => navigation.navigate('Subscription')}
+          >
+            <Text style={styles.menuIcon}>💎</Text>
+            <Text style={[styles.menuText, { color: colors.text }]}>Abonelik</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -234,6 +252,8 @@ function MainNavigator() {
       <Stack.Screen name="CreateExam" component={CreateExamScreen} />
       <Stack.Screen name="PendingStudents" component={PendingStudentsScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="OpticalTemplate" component={OpticalTemplateScreen} />
+      <Stack.Screen name="Subscription" component={SubscriptionScreen} />
     </Stack.Navigator>
   );
 }
